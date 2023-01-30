@@ -10,6 +10,7 @@ from mne_nirs.signal_enhancement import enhance_negative_correlation
 # Import MNE processing
 from mne.viz import plot_compare_evokeds
 from mne import Epochs, events_from_annotations, set_log_level
+from mne.filter import resample
 
 # Other Tooling
 import pandas as pd
@@ -18,13 +19,28 @@ import os
 from collections import defaultdict
 from copy import deepcopy
 from itertools import compress
+import matplotlib.pyplot as plt
 
 
 def individual_analysis(bids_path, trigger_id):
+    """
+    TLDR:
+        This function takes in the file path to the BIDS directory and the dictionary that renames numeric triggers.
+        This function returns raw haemodynamic (from the beer lambert function) data per MNE specs and epochs for the triggers.
 
+    Examples of each variables:
+        bids_path (str) = '../../LabResearch/IndependentStudy/DataAnalysis'
+        trigger_id (dict) = {'4': 'Control', '2': 'Neutral', '3': 'Inflammatory', '1':'Practice'}
+
+    Documentation:
+        raw_haemo: https://mne.tools/stable/auto_tutorials/preprocessing/70_fnirs_processing.html#sphx-glr-auto-tutorials-preprocessing-70-fnirs-processing-py
+        epochs: https://mne.tools/stable/generated/mne.Epochs.html#mne-epochs
+
+    """
     # Read data with annotations in BIDS format
     # raw_intensity = read_raw_bids(bids_path=bids_path, verbose=False)
     raw_intensity = mne.io.read_raw_snirf(bids_path, verbose=True, preload=False)
+
     raw_intensity = get_long_channels(raw_intensity, min_dist=0.01)
     
     channel_types = raw_intensity.copy()
@@ -52,7 +68,11 @@ def individual_analysis(bids_path, trigger_id):
     raw_haemo = enhance_negative_correlation(raw_haemo)
     # Extract events but ignore those with
     # the word Ends (i.e. drop ExperimentEnds events)
+
+    # TODO: Need to add something here to be able to work in custom triggers
     events, event_dict = events_from_annotations(raw_haemo, verbose=False)
+
+    print(events)
     
     # Remove all STOP triggers to hardcode duration to 30 secs per MNE specs
     events = events[::2]
@@ -67,7 +87,22 @@ def individual_analysis(bids_path, trigger_id):
 
 
 def aggregate_epochs(root_dir, trigger_id, ignore):
-    all_evokeds = defaultdict(list)
+    """
+    TLDR:
+        Cycles through the participants in bids folders and returns epochs based on the trigger associated with it
+        This function takes in the root directory, trigger_id dict and ignore parameters.
+        This function returns a dict with the keys being trigger names and the value being an array of epochs.
+
+    Examples of each variables:
+        root_dir (str) = '../../LabResearch/IndependentStudy/DataAnalysis'
+        trigger_id (dict) = {'4': 'Control', '2': 'Neutral', '3': 'Inflammatory', '1':'Practice'}
+        ignore (array) = [".DS_Store", "sub-03"]
+
+    Documentation:
+        epochs: https://mne.tools/stable/generated/mne.Epochs.html#mne-epochs
+
+    """
+    all_epochs = defaultdict(list)
 
     subjects = os.listdir(f'{root_dir}/BIDS_Anon/')
 
@@ -81,13 +116,34 @@ def aggregate_epochs(root_dir, trigger_id, ignore):
 
             for cidx, condition in enumerate(epochs.event_id):
                 # all_evokeds[condition].append(epochs[condition].average())
-                all_evokeds[condition].append(epochs[condition])
+                all_epochs[condition].append(epochs[condition])
 
-    return all_evokeds
+    return all_epochs
 
 
-def extract_all_amplitudes(all_epochs, columns, tmin, tmax):
-    df = pd.DataFrame(columns=columns)
+def extract_all_amplitudes(all_epochs, tmin, tmax):
+    """
+        TLDR:
+            Takes in all_epochs dict and returns a data frame of all the the optical measurements taken during the experiment.
+            The dataframe columns represent timestamps and the rows represent hbo/hbr of each users fNIRs session.
+
+        Examples of each variables:
+            all_epochs (dict) = 
+                    ({'Control': [<Epochs |  3 events (all good), -1.25 - 15 sec, baseline -1.25 – 0 sec, ~171 kB, data loaded,
+                    'Control': 3>,
+                    <Epochs |  3 events (all good), -1.25 - 15 sec, baseline -1.25 – 0 sec, ~171 kB, data loaded,
+                    'Control': 3>,
+                    <Epochs |  3 events (all good), -1.25 - 15 sec, baseline -1.25 – 0 sec, ~171 kB, data loaded,
+                    'Control': 3>])
+            columns (array) = ['Name 1', 'Name 2', 'Name 3'] 
+                * note: array length must match the number of columns
+            tmin (int/float) = In relation to 0 (time of trigger) what is the minimum time from that point you want to analyze (can be negative)
+            tmax (inf/float) = In relation to 0 (time of trigger) what is the maximum time from that point you want to analyze
+
+        Documentation:
+            epochs: https://mne.tools/stable/generated/mne.Epochs.html#mne-epochs
+
+    """
     temporal_measurements = []
 
     for idx, epoch in enumerate(all_epochs):
@@ -109,7 +165,28 @@ def extract_all_amplitudes(all_epochs, columns, tmin, tmax):
     return measurement_df
 
 
-def extract_average_amplitudes(all_epochs, columns, tmin, tmax):
+def extract_average_amplitudes(all_epochs, tmin, tmax):
+    """
+        TLDR:
+            Takes in all_epochs dict and returns a data frame of the average measurements taken during the experiment per subject and condition.
+            The dataframe columns represent timestamps and the rows represent hbo/hbr of each users fNIRs session.
+
+        Examples of each variables:
+            all_epochs (dict) = 
+                    ({'Control': [<Epochs |  3 events (all good), -1.25 - 15 sec, baseline -1.25 – 0 sec, ~171 kB, data loaded,
+                    'Control': 3>,
+                    <Epochs |  3 events (all good), -1.25 - 15 sec, baseline -1.25 – 0 sec, ~171 kB, data loaded,
+                    'Control': 3>,
+                    <Epochs |  3 events (all good), -1.25 - 15 sec, baseline -1.25 – 0 sec, ~171 kB, data loaded,
+                    'Control': 3>])
+            tmin (int/float) = In relation to 0 (time of trigger) what is the minimum time from that point you want to analyze (can be negative)
+            tmax (inf/float) = In relation to 0 (time of trigger) what is the maximum time from that point you want to analyze
+
+        Documentation:
+            epochs: https://mne.tools/stable/generated/mne.Epochs.html#mne-epochs
+
+    """
+    columns = ['ID', 'Chroma', 'Condition', 'Value']
     df = pd.DataFrame(columns=columns)
     temporal_measurements = []
 
