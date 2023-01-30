@@ -16,15 +16,14 @@ def generate_raw_intensity(path):
 
 def evaluate_raw_signal(path):
     raw = generate_raw_intensity(path)
-
-    raw_od = optical_density(raw)
-
+    print(raw.times[-1])
     # Plot the Raw Optical Density
-    raw_od.plot(n_channels=55, duration=4000, show_scrollbars=True, clipping=None)
+    # raw_od.plot(n_channels=55, duration=4000, show_scrollbars=True, clipping=None)
 
 
 def evaluate_sci(path):
     raw = generate_raw_intensity(path)
+    scan_length = raw.times[-1]
     raw_od = optical_density(raw)
     sci = mne.preprocessing.nirs.scalp_coupling_index(raw_od)
 
@@ -34,7 +33,7 @@ def evaluate_sci(path):
 
     raw_od.plot_sensors()
 
-    raw_od.copy().plot(n_channels=55, duration=40000, show_scrollbars=False,
+    raw_od.copy().plot(n_channels=55, duration=scan_length, show_scrollbars=False,
          clipping=None, scalings={'fnirs_od': 0.2})
 
     # Plots a histogram of the SCI values

@@ -43,19 +43,16 @@ def individual_analysis(bids_path, trigger_id):
 
     raw_intensity = get_long_channels(raw_intensity, min_dist=0.01)
     
-    channel_types = raw_intensity.copy()
-    # print(channel_types)
-    
+    # Rename the numeric triggers for ease of processing later
     raw_intensity.annotations.rename(trigger_id)
 
-    # Convert signal to optical density and determine bad channels
+    # Convert raw signal to optical density
     raw_od = optical_density(raw_intensity)
 
     # Evaluating the channels for their quality and removing them
     sci = scalp_coupling_index(raw_od, h_freq=1.35, h_trans_bandwidth=0.1)
-
     raw_od.info["bads"] = list(compress(raw_od.ch_names, sci < 0.5))
-    
+
     # TODO: Interpolate bads has caused issues in the past but is needed to clean the bad channels.
     raw_od.interpolate_bads()
 
