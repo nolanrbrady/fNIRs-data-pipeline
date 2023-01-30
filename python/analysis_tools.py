@@ -86,7 +86,7 @@ def individual_analysis(bids_path, trigger_id):
     return raw_haemo, epochs
 
 
-def aggregate_epochs(root_dir, trigger_id, ignore):
+def aggregate_epochs(paths, trigger_id):
     """
     TLDR:
         Cycles through the participants in bids folders and returns epochs based on the trigger associated with it
@@ -94,9 +94,8 @@ def aggregate_epochs(root_dir, trigger_id, ignore):
         This function returns a dict with the keys being trigger names and the value being an array of epochs.
 
     Examples of each variables:
-        root_dir (str) = '../../LabResearch/IndependentStudy/DataAnalysis'
+        root_dir ([str]) = ['../../LabResearch/IndependentStudy/DataAnalysis'] generated from import_data_folder function
         trigger_id (dict) = {'4': 'Control', '2': 'Neutral', '3': 'Inflammatory', '1':'Practice'}
-        ignore (array) = [".DS_Store", "sub-03"]
 
     Documentation:
         epochs: https://mne.tools/stable/generated/mne.Epochs.html#mne-epochs
@@ -104,19 +103,14 @@ def aggregate_epochs(root_dir, trigger_id, ignore):
     """
     all_epochs = defaultdict(list)
 
-    subjects = os.listdir(f'{root_dir}/BIDS_Anon/')
+    for f_path in paths:
 
-    for sub in subjects:
-        if sub not in ignore:
-            # Create path to file based on experiment info
-            f_path = f'{root_dir}/BIDS_Anon/{sub}/nirs/{sub}_task-AnonCom_nirs.snirf'
+        # Analyze data and return both ROI and channel results
+        raw_haemo, epochs = individual_analysis(f_path, trigger_id)
 
-            # Analyze data and return both ROI and channel results
-            raw_haemo, epochs = individual_analysis(f_path, trigger_id)
-
-            for cidx, condition in enumerate(epochs.event_id):
-                # all_evokeds[condition].append(epochs[condition].average())
-                all_epochs[condition].append(epochs[condition])
+        for cidx, condition in enumerate(epochs.event_id):
+            # all_evokeds[condition].append(epochs[condition].average())
+            all_epochs[condition].append(epochs[condition])
 
     return all_epochs
 
