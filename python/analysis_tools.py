@@ -189,6 +189,7 @@ def extract_average_amplitudes(all_epochs, tmin, tmax):
     columns = ['ID', 'Chroma', 'Condition', 'Value']
     df = pd.DataFrame(columns=columns)
     temporal_measurements = []
+    columns = ['ID', 'Chroma', 'Condition', 'Value']
 
     for idx, epoch in enumerate(all_epochs):
         subj_id = 0
