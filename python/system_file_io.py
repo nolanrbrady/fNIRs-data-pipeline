@@ -6,8 +6,30 @@ import pandas as pd
 def import_data_folder (path, ignored_dirs):
     """
     This function takes in one folder and determines the studies groups and subjects through the fil structure
+
+    File Structure Expected:
+    - Data
+        - Group 1
+            - Sub-1
+                - nirs
+                    - something.snirf
+            - Sub-2
+                - nirs
+                    - something.snirf
+            - Sub-3
+                - nirs
+                    - something.snirf
+        - Group-2
+            - Sub-4
+                - nirs
+                    - something.snirf
+            - Sub-5
+                - nirs
+                    - something.snirf
+            - Sub-6
+                - nirs
+                    - something.snirf
     """
-    print("importing data folder firing: ", path)
     groups = os.listdir(path)
     columns=['group', 'sub_name', 'snirf_path']
     data = []
