@@ -83,8 +83,6 @@ def individual_analysis(bids_path, trigger_id, variable_epoch_time):
         # of the data remains the same.
         epochs = [epochs]
 
-    print(epochs)
-
     return epochs
 
 
@@ -211,18 +209,59 @@ def extract_average_amplitudes(all_epochs, tmin, tmax):
 
 
 def dynamic_time_epoch_generation(raw_haemo, event_dict, events):
-    # print(len(events))
-    # print(raw_haemo)
-
+    all_epochs = []
+    adjusted_dict = { 1: {'Practice': 1},
+        2: {'Neutral': 2},
+        3: {'Inflammatory': 3},
+        4: {'Control': 4}}
     for index, event in enumerate(events):
+        total_len = len(events) - 1
+
+        if index == total_len:
+            event_type = events[- 1][2]
+            prev_event_time = events[-2][0]
+            current_event_time = events[-1][0]
+            task_len = current_event_time - prev_event_time
+            event_id = adjusted_dict[event_type]
+            
+            # Create a temporary events array for the epoch creation
+            current_event = [[prev_event_time, 0, event_type], [current_event_time, 0, event_type]]
+            
+
+            epochs = Epochs(raw_haemo, events = current_event, event_id=event_id, 
+                        tmin=-1, tmax=task_len,
+                        reject=dict(hbo=200e-6), reject_by_annotation=True,
+                        proj=True, baseline=(None, 0), detrend=0,
+                        preload=True, verbose=False) 
+
+            all_epochs.append(epochs) 
+            # print(adjusted_dict[event_type])
+        
         if index % 2 == 0 and index != 0:
+            # Find the event_id to be able to match it with the event_dict
+            event_type = events[index - 1][2]
+            
+            # Identify the first and second triggers time stamps
             prev_event_time = events[index - 2][0]
             current_event_time = events[index - 1][0]
+
+            # Finds the length between two "working" period triggers
             task_len = current_event_time - prev_event_time
 
-            epochs = Epochs(raw_haemo, events, event_id=event_dict, tmin=-1, tmax=15,
+            event_id = adjusted_dict[event_type]
+
+            # Create a temporary events array for the epoch creation
+            current_event = [[prev_event_time, 0, event_type], [current_event_time, 0, event_type]]
+            
+            epochs = Epochs(raw_haemo, events = current_event, event_id=event_id, 
+                        tmin=-1, tmax=task_len,
                         reject=dict(hbo=200e-6), reject_by_annotation=True,
                         proj=True, baseline=(None, 0), detrend=0,
                         preload=True, verbose=False)        
 
-    return epochs
+            all_epochs.append(epochs)
+            # print(adjusted_dict[event_type])
+
+        print(all_epochs)
+
+    return all_epochs
