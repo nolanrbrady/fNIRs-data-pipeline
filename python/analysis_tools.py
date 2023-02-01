@@ -4,7 +4,7 @@ import mne
 from mne_nirs.channels import get_long_channels
 from mne_nirs.channels import picks_pair_to_idx
 from mne_nirs.datasets import fnirs_motor_group
-from mne.preprocessing.nirs import beer_lambert_law, optical_density, temporal_derivative_distribution_repair, scalp_coupling_index
+from mne.preprocessing.nirs import beer_lambert_law
 from mne_nirs.signal_enhancement import enhance_negative_correlation
 
 # Import MNE processing
@@ -20,7 +20,13 @@ from collections import defaultdict
 from copy import deepcopy
 from itertools import compress
 import matplotlib.pyplot as plt
+import importlib
 
+
+# Local functions
+import quality_eval
+
+importlib.reload(quality_eval)
 
 def individual_analysis(bids_path, trigger_id):
     """
@@ -46,19 +52,7 @@ def individual_analysis(bids_path, trigger_id):
     # Rename the numeric triggers for ease of processing later
     raw_intensity.annotations.rename(trigger_id)
 
-    # Convert raw signal to optical density
-    raw_od = optical_density(raw_intensity)
-
-    # Evaluating the channels for their quality and removing them
-    sci = scalp_coupling_index(raw_od, h_freq=1.35, h_trans_bandwidth=0.1)
-    raw_od.info["bads"] = list(compress(raw_od.ch_names, sci < 0.5))
-
-    # TODO: Interpolate bads has caused issues in the past but is needed to clean the bad channels.
-    raw_od.interpolate_bads()
-
-    # Downsample and apply signal cleaning techniques
-    raw_od.resample(0.8)
-    raw_od = temporal_derivative_distribution_repair(raw_od)
+    raw_od = quality_eval.signal_preprocessing(raw_intensity)
 
     # Convert to haemoglobin and filter
     raw_haemo = beer_lambert_law(raw_od, ppf=0.1)

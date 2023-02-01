@@ -4,8 +4,7 @@ import numpy as np
 from itertools import compress
 import matplotlib.pyplot as plt
 
-from mne.preprocessing.nirs import optical_density
-from mne_nirs.preprocessing import peak_power, scalp_coupling_index_windowed
+from mne.preprocessing.nirs import optical_density, temporal_derivative_distribution_repair, scalp_coupling_index
 from mne_nirs.visualisation import plot_timechannel_quality_metric
 
 def generate_raw_intensity(path):
@@ -41,4 +40,29 @@ def evaluate_sci(path):
     # ax.hist(sci)
     # ax.set(xlabel=f'Scalp Coupling Index', ylabel='Count', xlim=[0, 1])
     # plt.show()
+
+def signal_preprocessing(raw_intensity):
+    """
+    Takes in raw intensity and applies scalp coupling indexing to identify bad channels.
+    Once bad channels are removed downsampling occurs, the baseline shift is corrected
+    and spike artifacts are removed.
+
+    Returns cleaned raw optical density data.
+    """
+    # Convert raw signal to optical density
+    raw_od = optical_density(raw_intensity)
+
+    # Evaluating the channels for their quality and removing them
+    sci = scalp_coupling_index(raw_od, h_freq=1.35, h_trans_bandwidth=0.1)
+    raw_od.info["bads"] = list(compress(raw_od.ch_names, sci < 0.5))
+
+    # TODO: Interpolate bads has caused issues in the past but is needed to clean the bad channels.
+    raw_od.interpolate_bads()
+
+    # Downsample and apply signal cleaning techniques
+    raw_od.resample(0.8)
+
+    # This approach removes baseline shift and spike artifacts
+    raw_od = temporal_derivative_distribution_repair(raw_od)
+    return raw_od
 
