@@ -79,8 +79,13 @@ def individual_analysis(bids_path, trigger_id, variable_epoch_time):
                         reject=dict(hbo=200e-6), reject_by_annotation=True,
                         proj=True, baseline=(None, 0), detrend=0,
                         preload=True, verbose=False)
+        # Doing this to ensure that if variable_epoch_time is True or False the format
+        # of the data remains the same.
+        epochs = [epochs]
 
-    return raw_haemo, epochs
+    print(epochs)
+
+    return epochs
 
 
 def aggregate_epochs(paths, trigger_id, variable_epoch_time):
@@ -102,13 +107,11 @@ def aggregate_epochs(paths, trigger_id, variable_epoch_time):
 
     for f_path in paths:
 
-        # Analyze data and return both ROI and channel results
-        raw_haemo, epochs = individual_analysis(f_path, trigger_id, variable_epoch_time)
-
-        for cidx, condition in enumerate(epochs.event_id):
-            # all_evokeds[condition].append(epochs[condition].average())
-            all_epochs[condition].append(epochs[condition])
-
+        epochs = individual_analysis(f_path, trigger_id, variable_epoch_time)
+        for epoch in epochs:
+            for cidx, condition in enumerate(epoch.event_id):
+                all_epochs[condition].append(epoch[condition])
+    
     return all_epochs
 
 
@@ -210,13 +213,16 @@ def extract_average_amplitudes(all_epochs, tmin, tmax):
 def dynamic_time_epoch_generation(raw_haemo, event_dict, events):
     # print(len(events))
     # print(raw_haemo)
+
     for index, event in enumerate(events):
         if index % 2 == 0 and index != 0:
             prev_event_time = events[index - 2][0]
             current_event_time = events[index - 1][0]
             task_len = current_event_time - prev_event_time
 
-            
+            epochs = Epochs(raw_haemo, events, event_id=event_dict, tmin=-1, tmax=15,
+                        reject=dict(hbo=200e-6), reject_by_annotation=True,
+                        proj=True, baseline=(None, 0), detrend=0,
+                        preload=True, verbose=False)        
 
-    result = "It's fucking broken"
-    return result
+    return epochs
