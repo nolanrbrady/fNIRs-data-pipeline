@@ -28,7 +28,7 @@ import quality_eval
 
 importlib.reload(quality_eval)
 
-def individual_analysis(bids_path, trigger_id):
+def individual_analysis(bids_path, trigger_id, variable_epoch_time):
     """
     TLDR:
         This function takes in the file path to the BIDS directory and the dictionary that renames numeric triggers.
@@ -68,21 +68,22 @@ def individual_analysis(bids_path, trigger_id):
     # TODO: Need to add something here to be able to work in custom triggers
     events, event_dict = events_from_annotations(raw_haemo, verbose=False)
 
-    print(events)
-    
-    # Remove all STOP triggers to hardcode duration to 30 secs per MNE specs
-    events = events[::2]
-    # print(events)
-
-    epochs = Epochs(raw_haemo, events, event_id=event_dict, tmin=-1, tmax=15,
-                    reject=dict(hbo=200e-6), reject_by_annotation=True,
-                    proj=True, baseline=(None, 0), detrend=0,
-                    preload=True, verbose=False)
+    if variable_epoch_time:
+        epochs = dynamic_time_epoch_generation(raw_haemo, event_dict, events)
+    else:
+        # Remove all STOP triggers to hardcode duration to 30 secs per MNE specs
+        #TODO: We'll need to remove this for all other datasets
+        events = events[::2]
+        
+        epochs = Epochs(raw_haemo, events, event_id=event_dict, tmin=-1, tmax=15,
+                        reject=dict(hbo=200e-6), reject_by_annotation=True,
+                        proj=True, baseline=(None, 0), detrend=0,
+                        preload=True, verbose=False)
 
     return raw_haemo, epochs
 
 
-def aggregate_epochs(paths, trigger_id):
+def aggregate_epochs(paths, trigger_id, variable_epoch_time):
     """
     TLDR:
         Cycles through the participants in bids folders and returns epochs based on the trigger associated with it
@@ -102,7 +103,7 @@ def aggregate_epochs(paths, trigger_id):
     for f_path in paths:
 
         # Analyze data and return both ROI and channel results
-        raw_haemo, epochs = individual_analysis(f_path, trigger_id)
+        raw_haemo, epochs = individual_analysis(f_path, trigger_id, variable_epoch_time)
 
         for cidx, condition in enumerate(epochs.event_id):
             # all_evokeds[condition].append(epochs[condition].average())
@@ -204,3 +205,18 @@ def extract_average_amplitudes(all_epochs, tmin, tmax):
 
     df['Value'] = pd.to_numeric(df['Value'])  # some Pandas have this as object
     return df
+
+
+def dynamic_time_epoch_generation(raw_haemo, event_dict, events):
+    # print(len(events))
+    # print(raw_haemo)
+    for index, event in enumerate(events):
+        if index % 2 == 0 and index != 0:
+            prev_event_time = events[index - 2][0]
+            current_event_time = events[index - 1][0]
+            task_len = current_event_time - prev_event_time
+
+            
+
+    result = "It's fucking broken"
+    return result
