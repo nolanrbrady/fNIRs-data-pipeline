@@ -4,7 +4,7 @@ import mne
 from mne_nirs.channels import get_long_channels
 from mne_nirs.channels import picks_pair_to_idx
 from mne_nirs.datasets import fnirs_motor_group
-from mne.preprocessing.nirs import beer_lambert_law, optical_density, temporal_derivative_distribution_repair, scalp_coupling_index
+from mne.preprocessing.nirs import beer_lambert_law
 from mne_nirs.signal_enhancement import enhance_negative_correlation
 
 # Import MNE processing
@@ -20,7 +20,13 @@ from collections import defaultdict
 from copy import deepcopy
 from itertools import compress
 import matplotlib.pyplot as plt
+import importlib
 
+
+# Local functions
+import quality_eval
+
+importlib.reload(quality_eval)
 
 def individual_analysis(bids_path, trigger_id):
     """
@@ -43,20 +49,10 @@ def individual_analysis(bids_path, trigger_id):
 
     raw_intensity = get_long_channels(raw_intensity, min_dist=0.01)
     
-    channel_types = raw_intensity.copy()
-    # print(channel_types)
-    
+    # Rename the numeric triggers for ease of processing later
     raw_intensity.annotations.rename(trigger_id)
 
-    # Convert signal to optical density and determine bad channels
-    raw_od = optical_density(raw_intensity)
-    sci = scalp_coupling_index(raw_od, h_freq=1.35, h_trans_bandwidth=0.1)
-    raw_od.info["bads"] = list(compress(raw_od.ch_names, sci < 0.5))
-    # raw_od.interpolate_bads()
-
-    # Downsample and apply signal cleaning techniques
-    raw_od.resample(0.8)
-    raw_od = temporal_derivative_distribution_repair(raw_od)
+    raw_od = quality_eval.signal_preprocessing(raw_intensity)
 
     # Convert to haemoglobin and filter
     raw_haemo = beer_lambert_law(raw_od, ppf=0.1)
@@ -86,7 +82,7 @@ def individual_analysis(bids_path, trigger_id):
     return raw_haemo, epochs
 
 
-def aggregate_epochs(root_dir, trigger_id, ignore):
+def aggregate_epochs(paths, trigger_id):
     """
     TLDR:
         Cycles through the participants in bids folders and returns epochs based on the trigger associated with it
@@ -94,9 +90,8 @@ def aggregate_epochs(root_dir, trigger_id, ignore):
         This function returns a dict with the keys being trigger names and the value being an array of epochs.
 
     Examples of each variables:
-        root_dir (str) = '../../LabResearch/IndependentStudy/DataAnalysis'
+        root_dir ([str]) = ['../../LabResearch/IndependentStudy/DataAnalysis'] generated from import_data_folder function
         trigger_id (dict) = {'4': 'Control', '2': 'Neutral', '3': 'Inflammatory', '1':'Practice'}
-        ignore (array) = [".DS_Store", "sub-03"]
 
     Documentation:
         epochs: https://mne.tools/stable/generated/mne.Epochs.html#mne-epochs
@@ -104,19 +99,14 @@ def aggregate_epochs(root_dir, trigger_id, ignore):
     """
     all_epochs = defaultdict(list)
 
-    subjects = os.listdir(f'{root_dir}/BIDS_Anon/')
+    for f_path in paths:
 
-    for sub in subjects:
-        if sub not in ignore:
-            # Create path to file based on experiment info
-            f_path = f'{root_dir}/BIDS_Anon/{sub}/nirs/{sub}_task-AnonCom_nirs.snirf'
+        # Analyze data and return both ROI and channel results
+        raw_haemo, epochs = individual_analysis(f_path, trigger_id)
 
-            # Analyze data and return both ROI and channel results
-            raw_haemo, epochs = individual_analysis(f_path, trigger_id)
-
-            for cidx, condition in enumerate(epochs.event_id):
-                # all_evokeds[condition].append(epochs[condition].average())
-                all_epochs[condition].append(epochs[condition])
+        for cidx, condition in enumerate(epochs.event_id):
+            # all_evokeds[condition].append(epochs[condition].average())
+            all_epochs[condition].append(epochs[condition])
 
     return all_epochs
 
