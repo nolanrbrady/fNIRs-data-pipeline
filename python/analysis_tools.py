@@ -121,7 +121,7 @@ def aggregate_epochs(paths, trigger_id, variable_epoch_time):
     return all_epochs
 
 
-def extract_all_amplitudes(all_epochs, tmin, tmax):
+def extract_all_amplitudes(all_epochs, tmin=False, tmax=False):
     """
         TLDR:
             Takes in all_epochs dict and returns a data frame of all the the optical measurements taken during the experiment.
@@ -144,7 +144,7 @@ def extract_all_amplitudes(all_epochs, tmin, tmax):
 
     """
     temporal_measurements = []
-
+    
     for idx, epoch in enumerate(all_epochs):
         subj_id = 0
         for subj_data in all_epochs[epoch]:
@@ -152,13 +152,17 @@ def extract_all_amplitudes(all_epochs, tmin, tmax):
             # can be either "hbo", "hbr", or both
             for chroma in ["hbo", "hbr"]:
                 data = deepcopy(subj_data.average(picks=chroma))
-                value = data.crop(tmin=tmin, tmax=tmax).data * 1.0e6
+                # If tmins and tmax are not specified calculate the event duration from the epoch
+                if tmin == False and tmax == False:
+                    tmin = subj_data.times[0]
+                    tmax = subj_data.times[-1]
                 
+                value = data.crop(tmin=tmin, tmax=tmax).data * 1.0e6
                 # Reshape the data to be a flat numpy array
                 value = np.reshape(value, -1)
-                # print(len(value))
+                
                 temporal_measurements.append(value)
-
+    
     temporal_measurements = np.array(temporal_measurements)
     print(temporal_measurements.shape)
     measurement_df = pd.DataFrame(temporal_measurements)
