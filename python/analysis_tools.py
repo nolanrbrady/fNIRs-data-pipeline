@@ -25,10 +25,12 @@ import importlib
 
 # Local functions
 import quality_eval
+import dynamic_interval_tools
 
 importlib.reload(quality_eval)
+importlib.reload(dynamic_interval_tools)
 
-def individual_analysis(bids_path, trigger_id, variable_epoch_time):
+def individual_analysis(bids_path, trigger_id, variable_epoch_time, custom_triggers = False):
     """
     TLDR:
         This function takes in the file path to the BIDS directory and the dictionary that renames numeric triggers.
@@ -65,11 +67,17 @@ def individual_analysis(bids_path, trigger_id, variable_epoch_time):
     # Extract events but ignore those with
     # the word Ends (i.e. drop ExperimentEnds events)
 
-    # TODO: Need to add something here to be able to work in custom triggers
-    events, event_dict = events_from_annotations(raw_haemo, verbose=False)
+    
+    if custom_triggers:
+        # TODO: Need to add something here to be able to work in custom triggers
+        print('We need to add code to handle custom triggers')
+    else:
+        events, event_dict = events_from_annotations(raw_haemo, verbose=False)
 
+    # Logic splits here since there are fundamental differences in how we handle Epoch
+    # generation in dynamic intervals instead of block intervals.
     if variable_epoch_time:
-        epochs = dynamic_time_epoch_generation(raw_haemo, event_dict, events)
+        epochs = dynamic_interval_tools.epoch_generation(raw_haemo, event_dict, events)
     else:
         # Remove all STOP triggers to hardcode duration to 30 secs per MNE specs
         #TODO: We'll need to remove this for all other datasets
@@ -126,8 +134,7 @@ def extract_all_amplitudes(all_epochs, tmin, tmax):
                     <Epochs |  3 events (all good), -1.25 - 15 sec, baseline -1.25 – 0 sec, ~171 kB, data loaded,
                     'Control': 3>,
                     <Epochs |  3 events (all good), -1.25 - 15 sec, baseline -1.25 – 0 sec, ~171 kB, data loaded,
-                    'Control': 3>])
-            columns (array) = ['Name 1', 'Name 2', 'Name 3'] 
+                    'Control': 3>]) 
                 * note: array length must match the number of columns
             tmin (int/float) = In relation to 0 (time of trigger) what is the minimum time from that point you want to analyze (can be negative)
             tmax (inf/float) = In relation to 0 (time of trigger) what is the maximum time from that point you want to analyze
@@ -149,15 +156,17 @@ def extract_all_amplitudes(all_epochs, tmin, tmax):
                 
                 # Reshape the data to be a flat numpy array
                 value = np.reshape(value, -1)
+                # print(len(value))
                 temporal_measurements.append(value)
 
     temporal_measurements = np.array(temporal_measurements)
+    print(temporal_measurements.shape)
     measurement_df = pd.DataFrame(temporal_measurements)
 
     return measurement_df
 
 
-def extract_average_amplitudes(all_epochs, tmin, tmax):
+def extract_average_amplitudes(all_epochs, tmin=False, tmax=False):
     """
         TLDR:
             Takes in all_epochs dict and returns a data frame of the average measurements taken during the experiment per subject and condition.
@@ -181,7 +190,6 @@ def extract_average_amplitudes(all_epochs, tmin, tmax):
     columns = ['ID', 'Chroma', 'Condition', 'Value']
     df = pd.DataFrame(columns=columns)
     temporal_measurements = []
-    columns = ['ID', 'Chroma', 'Condition', 'Value']
 
     for idx, epoch in enumerate(all_epochs):
         subj_id = 0
@@ -190,78 +198,18 @@ def extract_average_amplitudes(all_epochs, tmin, tmax):
             # can be either "hbo", "hbr", or both
             for chroma in ["hbo", "hbr"]:
                 data = deepcopy(subj_data.average(picks=chroma))
-                value = data.crop(tmin=tmin, tmax=tmax).data * 1.0e6
-                
-                # Reshape the data to be a flat numpy array
-                value = np.reshape(value, -1)
-                temporal_measurements.append(value)
 
-                # Placeholder while we see if PCA gives better results (also how the MNE tutorial said to do it though)
-                avg_val = data.crop(tmin=tmin, tmax=tmax).data.mean() * 1.0e6
+                # If tmins and tmax are not specified calculate the event duration from the epoch
+                if tmin == False and tmax == False:
+                    tmin = subj_data.times[0]
+                    tmax = subj_data.times[-1]
+
+                value = data.crop(tmin=tmin, tmax=tmax).data.mean() * 1.0e6
 
                 # Append metadata and extracted feature to dataframe
                 this_df = pd.DataFrame(
-                    {'ID': subj_id, 'Chroma': chroma, 'Condition': epoch, 'Value': avg_val}, index=[0])
+                    {'ID': subj_id, 'Chroma': chroma, 'Condition': epoch, 'Value': value}, index=[0])
                 df = pd.concat([df, this_df], ignore_index=True)
 
     df['Value'] = pd.to_numeric(df['Value'])  # some Pandas have this as object
     return df
-
-
-def dynamic_time_epoch_generation(raw_haemo, event_dict, events):
-    all_epochs = []
-    adjusted_dict = { 1: {'Practice': 1},
-        2: {'Neutral': 2},
-        3: {'Inflammatory': 3},
-        4: {'Control': 4}}
-    for index, event in enumerate(events):
-        total_len = len(events) - 1
-
-        if index == total_len:
-            event_type = events[- 1][2]
-            prev_event_time = events[-2][0]
-            current_event_time = events[-1][0]
-            task_len = current_event_time - prev_event_time
-            event_id = adjusted_dict[event_type]
-            
-            # Create a temporary events array for the epoch creation
-            current_event = [[prev_event_time, 0, event_type], [current_event_time, 0, event_type]]
-            
-
-            epochs = Epochs(raw_haemo, events = current_event, event_id=event_id, 
-                        tmin=-1, tmax=task_len,
-                        reject=dict(hbo=200e-6), reject_by_annotation=True,
-                        proj=True, baseline=(None, 0), detrend=0,
-                        preload=True, verbose=False) 
-
-            all_epochs.append(epochs) 
-            # print(adjusted_dict[event_type])
-        
-        if index % 2 == 0 and index != 0:
-            # Find the event_id to be able to match it with the event_dict
-            event_type = events[index - 1][2]
-            
-            # Identify the first and second triggers time stamps
-            prev_event_time = events[index - 2][0]
-            current_event_time = events[index - 1][0]
-
-            # Finds the length between two "working" period triggers
-            task_len = current_event_time - prev_event_time
-
-            event_id = adjusted_dict[event_type]
-
-            # Create a temporary events array for the epoch creation
-            current_event = [[prev_event_time, 0, event_type], [current_event_time, 0, event_type]]
-            
-            epochs = Epochs(raw_haemo, events = current_event, event_id=event_id, 
-                        tmin=-1, tmax=task_len,
-                        reject=dict(hbo=200e-6), reject_by_annotation=True,
-                        proj=True, baseline=(None, 0), detrend=0,
-                        preload=True, verbose=False)        
-
-            all_epochs.append(epochs)
-            # print(adjusted_dict[event_type])
-
-        print(all_epochs)
-
-    return all_epochs
