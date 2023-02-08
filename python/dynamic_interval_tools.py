@@ -37,7 +37,9 @@ def epoch_generation(raw_haemo, event_dict, events):
             event_id = adjusted_dict[event_type]
             
             # Create a temporary events array for the epoch creation
-            current_event = [[prev_event_time, 0, event_type], [current_event_time, 0, event_type]]
+            # Only use the start of the event for the event creation
+            # prev_event_trigger is time stamp for the start trigger
+            current_event = [[prev_event_time, 0, event_type]]
             
 
             epochs = Epochs(raw_haemo, events = current_event, event_id=event_id, 
@@ -63,7 +65,9 @@ def epoch_generation(raw_haemo, event_dict, events):
             event_id = adjusted_dict[event_type]
 
             # Create a temporary events array for the epoch creation
-            current_event = [[prev_event_time, 0, event_type], [current_event_time, 0, event_type]]
+            # Only use the start of the event for the event creation
+            # prev_event_trigger is time stamp for the start trigger
+            current_event = [[prev_event_time, 0, event_type]]
             
             epochs = Epochs(raw_haemo, events = current_event, event_id=event_id, 
                         tmin=-1, tmax=task_len,
