@@ -170,7 +170,7 @@ def extract_all_amplitudes(all_epochs, tmin=False, tmax=False):
     return measurement_df
 
 
-def extract_average_amplitudes(all_epochs, tmin=False, tmax=False):
+def extract_average_amplitudes(all_epochs, tmin=None, tmax=None):
     """
         TLDR:
             Takes in all_epochs dict and returns a data frame of the average measurements taken during the experiment per subject and condition.
@@ -204,7 +204,7 @@ def extract_average_amplitudes(all_epochs, tmin=False, tmax=False):
                 data = deepcopy(subj_data.average(picks=chroma))
 
                 # If tmins and tmax are not specified calculate the event duration from the epoch
-                if tmin == False and tmax == False:
+                if tmin == None and tmax == None:
                     tmin = subj_data.times[0]
                     tmax = subj_data.times[-1]
 
@@ -216,4 +216,44 @@ def extract_average_amplitudes(all_epochs, tmin=False, tmax=False):
                 df = pd.concat([df, this_df], ignore_index=True)
 
     df['Value'] = pd.to_numeric(df['Value'])  # some Pandas have this as object
+    return df
+
+
+def extract_channel_values(all_epochs, tmin = None, tmax = None):
+    channel_data = {}
+    row_names = {}
+    df = pd.DataFrame()
+    df_row_number = 0
+    for id, event_type in enumerate(all_epochs):
+        # Goes through all the epochs generated for the type of task, like "Control"
+        for epoch_index, epoch in enumerate(all_epochs[event_type]):
+        
+            # If no tmin and tmax is given we use the event triggers to delineate the event duration
+            if tmin == None and tmax == None:
+                tmin = epoch.times[0]
+                tmax = epoch.times[-1]
+
+            # Establish were the event occured and crop the rest
+            # TODO: Ensure that the tmin and tmax addition here actually crop the data where we expect (i.e with relation to the trigger)
+            data = epoch.get_data(tmin=tmin, tmax=tmax)
+            # Gets list of events within the individual epoch
+            event_ids = epoch.event_id
+            channel_averages = []
+            # Loop through each channel and extract the data from that channel
+            for channel_index, channel_name in enumerate(epoch.ch_names):
+                # Get the average reading for the channel
+                average = data[:, channel_index, :].mean() * 1.0e6
+                if average:
+                    channel_averages.append(average)
+            # Create a dataframe to store the channel averages.
+            # channel_data[f'{event_type}-{id}'] = channel_averages
+            this_df = pd.DataFrame(np.array(channel_averages).reshape(1,-1), columns=epoch.ch_names)        
+            # print(this_df)
+            df = pd.concat([df, this_df], ignore_index=True)
+            # Create a dictionary of row names in order to rename the dataframe indexs
+            row_names[df_row_number] = f'{event_type}-{epoch_index + 1}'
+            df_row_number += 1
+
+    # Convert indexes to names for ease of use later.
+    df = df.rename(index=row_names)
     return df
