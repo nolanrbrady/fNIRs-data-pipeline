@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 
 from mne.preprocessing.nirs import optical_density, temporal_derivative_distribution_repair, scalp_coupling_index
 from mne_nirs.visualisation import plot_timechannel_quality_metric
+from mne.preprocessing.nirs import beer_lambert_law
 
 def generate_raw_intensity(path):
     raw_intensity = mne.io.read_raw_snirf(path, verbose=True)
@@ -64,5 +65,11 @@ def signal_preprocessing(raw_intensity):
 
     # This approach removes baseline shift and spike artifacts
     raw_od = temporal_derivative_distribution_repair(raw_od)
-    return raw_od
+
+    # Convert to haemoglobin and filter
+    raw_haemo = beer_lambert_law(raw_od, ppf=0.1)
+    raw_haemo = raw_haemo.filter(0.02, 0.3,
+                                 h_trans_bandwidth=0.1, l_trans_bandwidth=0.01,
+                                 verbose=False)
+    return raw_haemo
 

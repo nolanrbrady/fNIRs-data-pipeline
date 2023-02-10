@@ -4,7 +4,6 @@ import mne
 from mne_nirs.channels import get_long_channels
 from mne_nirs.channels import picks_pair_to_idx
 from mne_nirs.datasets import fnirs_motor_group
-from mne.preprocessing.nirs import beer_lambert_law
 from mne_nirs.signal_enhancement import enhance_negative_correlation
 
 # Import MNE processing
@@ -54,13 +53,7 @@ def individual_analysis(bids_path, trigger_id, variable_epoch_time, custom_trigg
     # Rename the numeric triggers for ease of processing later
     raw_intensity.annotations.rename(trigger_id)
 
-    raw_od = quality_eval.signal_preprocessing(raw_intensity)
-
-    # Convert to haemoglobin and filter
-    raw_haemo = beer_lambert_law(raw_od, ppf=0.1)
-    raw_haemo = raw_haemo.filter(0.02, 0.3,
-                                 h_trans_bandwidth=0.1, l_trans_bandwidth=0.01,
-                                 verbose=False)
+    raw_haemo = quality_eval.signal_preprocessing(raw_intensity)
 
     # Apply further data cleaning techniques and extract epochs
     raw_haemo = enhance_negative_correlation(raw_haemo)
@@ -219,6 +212,10 @@ def extract_average_amplitudes(all_epochs, tmin=None, tmax=None):
 
 
 def extract_channel_values(all_epochs, tmin = None, tmax = None):
+    """
+    Takes in the all_epochs dict and returns a dataframe with the average hemoglobin concentration
+    per channel in each condition.
+    """
     #TODO: This is a really ugly function. Four nested for loops is pretty bad.
     # We'll have to come back to this to see if we can make it less of fuster cluck
     row_names = {}
