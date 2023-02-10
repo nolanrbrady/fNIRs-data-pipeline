@@ -221,7 +221,6 @@ def extract_average_amplitudes(all_epochs, tmin=None, tmax=None):
 def extract_channel_values(all_epochs, tmin = None, tmax = None):
     #TODO: This is a really ugly function. Four nested for loops is pretty bad.
     # We'll have to come back to this to see if we can make it less of fuster cluck
-    channel_data = {}
     row_names = {}
     df = pd.DataFrame()
     df_row_number = 0
@@ -236,24 +235,22 @@ def extract_channel_values(all_epochs, tmin = None, tmax = None):
 
             # Establish were the event occured and crop the rest
             data = epoch.get_data(tmin=tmin, tmax=tmax)
-
-            # TODO: To support block design we will have to loop through event_ids as well.
-            # Gets list of events within the individual epoch
-            events = epoch.events
-            channel_averages = []
-            # Loop through each channel and extract the data from that channel
-            for channel_index, channel_name in enumerate(epoch.ch_names):
-                # Get the average reading for the channel
-                average = data[:, channel_index, :].mean() * 1.0e6
-                channel_averages.append(average)
-            # Create a dataframe to store the channel averages.
-            # channel_data[f'{event_type}-{id}'] = channel_averages
-            this_df = pd.DataFrame(np.array(channel_averages).reshape(1,-1), columns=epoch.ch_names)        
-            # print(this_df)
-            df = pd.concat([df, this_df], ignore_index=True)
-            # Create a dictionary of row names in order to rename the dataframe indexs
-            row_names[df_row_number] = f'{event_type}-{epoch_index + 1}'
-            df_row_number += 1
+            # test = epoch.to_data_frame()
+            if len(epoch.events) >= 1:
+                channel_averages = []
+                # Loop through each channel and extract the data from that channel
+                for channel_index, channel_name in enumerate(epoch.ch_names):
+                    # Get the average reading for the channel
+                    average = data[:, channel_index, :].mean() * 1.0e6
+                    channel_averages.append(average)
+                # Create a dataframe to store the channel averages.
+                # channel_data[f'{event_type}-{id}'] = channel_averages
+                this_df = pd.DataFrame(np.array(channel_averages).reshape(1,-1), columns=epoch.ch_names)        
+                # print(this_df)
+                df = pd.concat([df, this_df], ignore_index=True)
+                # Create a dictionary of row names in order to rename the dataframe indexs
+                row_names[df_row_number] = f'{event_type}-{epoch_index + 1}'
+                df_row_number += 1
     # Convert indexes to names for ease of use later.
     df = df.rename(index=row_names)
     return df
