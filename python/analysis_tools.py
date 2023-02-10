@@ -4,7 +4,6 @@ import mne
 from mne_nirs.channels import get_long_channels
 from mne_nirs.channels import picks_pair_to_idx
 from mne_nirs.datasets import fnirs_motor_group
-from mne.preprocessing.nirs import beer_lambert_law
 from mne_nirs.signal_enhancement import enhance_negative_correlation
 
 # Import MNE processing
@@ -25,10 +24,12 @@ import importlib
 
 # Local functions
 import quality_eval
+import dynamic_interval_tools
 
 importlib.reload(quality_eval)
+importlib.reload(dynamic_interval_tools)
 
-def individual_analysis(bids_path, trigger_id):
+def individual_analysis(bids_path, trigger_id, variable_epoch_time, custom_triggers = False):
     """
     TLDR:
         This function takes in the file path to the BIDS directory and the dictionary that renames numeric triggers.
@@ -52,37 +53,39 @@ def individual_analysis(bids_path, trigger_id):
     # Rename the numeric triggers for ease of processing later
     raw_intensity.annotations.rename(trigger_id)
 
-    raw_od = quality_eval.signal_preprocessing(raw_intensity)
-
-    # Convert to haemoglobin and filter
-    raw_haemo = beer_lambert_law(raw_od, ppf=0.1)
-    raw_haemo = raw_haemo.filter(0.02, 0.3,
-                                 h_trans_bandwidth=0.1, l_trans_bandwidth=0.01,
-                                 verbose=False)
+    raw_haemo = quality_eval.signal_preprocessing(raw_intensity)
 
     # Apply further data cleaning techniques and extract epochs
     raw_haemo = enhance_negative_correlation(raw_haemo)
-    # Extract events but ignore those with
-    # the word Ends (i.e. drop ExperimentEnds events)
 
-    # TODO: Need to add something here to be able to work in custom triggers
-    events, event_dict = events_from_annotations(raw_haemo, verbose=False)
-
-    print(events)
     
-    # Remove all STOP triggers to hardcode duration to 30 secs per MNE specs
-    events = events[::2]
-    # print(events)
+    if custom_triggers:
+        # TODO: Need to add something here to be able to work in custom triggers
+        print('We need to add code to handle custom triggers')
+    else:
+        events, event_dict = events_from_annotations(raw_haemo, verbose=False)
 
-    epochs = Epochs(raw_haemo, events, event_id=event_dict, tmin=-1, tmax=15,
-                    reject=dict(hbo=200e-6), reject_by_annotation=True,
-                    proj=True, baseline=(None, 0), detrend=0,
-                    preload=True, verbose=False)
+    # Logic splits here since there are fundamental differences in how we handle Epoch
+    # generation in dynamic intervals instead of block intervals.
+    if variable_epoch_time:
+        epochs = dynamic_interval_tools.epoch_generation(raw_haemo, event_dict, events)
+    else:
+        # Remove all STOP triggers to hardcode duration to 30 secs per MNE specs
+        #TODO: We'll need to remove this for all other datasets
+        events = events[::2]
+        
+        epochs = Epochs(raw_haemo, events, event_id=event_dict, tmin=-1, tmax=15,
+                        reject=dict(hbo=200e-6), reject_by_annotation=True,
+                        proj=True, baseline=(None, 0), detrend=0,
+                        preload=True, verbose=False)
+        # Doing this to ensure that if variable_epoch_time is True or False the format
+        # of the data remains the same.
+        epochs = [epochs]
 
-    return raw_haemo, epochs
+    return epochs, raw_haemo
 
 
-def aggregate_epochs(paths, trigger_id):
+def aggregate_epochs(paths, trigger_id, variable_epoch_time):
     """
     TLDR:
         Cycles through the participants in bids folders and returns epochs based on the trigger associated with it
@@ -99,19 +102,18 @@ def aggregate_epochs(paths, trigger_id):
     """
     all_epochs = defaultdict(list)
 
+
     for f_path in paths:
 
-        # Analyze data and return both ROI and channel results
-        raw_haemo, epochs = individual_analysis(f_path, trigger_id)
-
-        for cidx, condition in enumerate(epochs.event_id):
-            # all_evokeds[condition].append(epochs[condition].average())
-            all_epochs[condition].append(epochs[condition])
-
+        epochs, raw_haemo = individual_analysis(f_path, trigger_id, variable_epoch_time)
+        for epoch in epochs:
+            for cidx, condition in enumerate(epoch.event_id):
+                all_epochs[condition].append(epoch[condition])
+    
     return all_epochs
 
 
-def extract_all_amplitudes(all_epochs, tmin, tmax):
+def extract_all_amplitudes(all_epochs, tmin=False, tmax=False):
     """
         TLDR:
             Takes in all_epochs dict and returns a data frame of all the the optical measurements taken during the experiment.
@@ -124,8 +126,7 @@ def extract_all_amplitudes(all_epochs, tmin, tmax):
                     <Epochs |  3 events (all good), -1.25 - 15 sec, baseline -1.25 – 0 sec, ~171 kB, data loaded,
                     'Control': 3>,
                     <Epochs |  3 events (all good), -1.25 - 15 sec, baseline -1.25 – 0 sec, ~171 kB, data loaded,
-                    'Control': 3>])
-            columns (array) = ['Name 1', 'Name 2', 'Name 3'] 
+                    'Control': 3>]) 
                 * note: array length must match the number of columns
             tmin (int/float) = In relation to 0 (time of trigger) what is the minimum time from that point you want to analyze (can be negative)
             tmax (inf/float) = In relation to 0 (time of trigger) what is the maximum time from that point you want to analyze
@@ -135,7 +136,7 @@ def extract_all_amplitudes(all_epochs, tmin, tmax):
 
     """
     temporal_measurements = []
-
+    
     for idx, epoch in enumerate(all_epochs):
         subj_id = 0
         for subj_data in all_epochs[epoch]:
@@ -143,19 +144,25 @@ def extract_all_amplitudes(all_epochs, tmin, tmax):
             # can be either "hbo", "hbr", or both
             for chroma in ["hbo", "hbr"]:
                 data = deepcopy(subj_data.average(picks=chroma))
-                value = data.crop(tmin=tmin, tmax=tmax).data * 1.0e6
+                # If tmins and tmax are not specified calculate the event duration from the epoch
+                if tmin == False and tmax == False:
+                    tmin = subj_data.times[0]
+                    tmax = subj_data.times[-1]
                 
+                value = data.crop(tmin=tmin, tmax=tmax).data * 1.0e6
                 # Reshape the data to be a flat numpy array
                 value = np.reshape(value, -1)
+                
                 temporal_measurements.append(value)
-
+    
     temporal_measurements = np.array(temporal_measurements)
+    print(temporal_measurements.shape)
     measurement_df = pd.DataFrame(temporal_measurements)
 
     return measurement_df
 
 
-def extract_average_amplitudes(all_epochs, tmin, tmax):
+def extract_average_amplitudes(all_epochs, tmin=None, tmax=None):
     """
         TLDR:
             Takes in all_epochs dict and returns a data frame of the average measurements taken during the experiment per subject and condition.
@@ -179,7 +186,6 @@ def extract_average_amplitudes(all_epochs, tmin, tmax):
     columns = ['ID', 'Chroma', 'Condition', 'Value']
     df = pd.DataFrame(columns=columns)
     temporal_measurements = []
-    columns = ['ID', 'Chroma', 'Condition', 'Value']
 
     for idx, epoch in enumerate(all_epochs):
         subj_id = 0
@@ -188,19 +194,60 @@ def extract_average_amplitudes(all_epochs, tmin, tmax):
             # can be either "hbo", "hbr", or both
             for chroma in ["hbo", "hbr"]:
                 data = deepcopy(subj_data.average(picks=chroma))
-                value = data.crop(tmin=tmin, tmax=tmax).data * 1.0e6
-                
-                # Reshape the data to be a flat numpy array
-                value = np.reshape(value, -1)
-                temporal_measurements.append(value)
 
-                # Placeholder while we see if PCA gives better results (also how the MNE tutorial said to do it though)
-                avg_val = data.crop(tmin=tmin, tmax=tmax).data.mean() * 1.0e6
+                # If tmins and tmax are not specified calculate the event duration from the epoch
+                if tmin == None and tmax == None:
+                    tmin = subj_data.times[0]
+                    tmax = subj_data.times[-1]
+
+                value = data.crop(tmin=tmin, tmax=tmax).data.mean() * 1.0e6
 
                 # Append metadata and extracted feature to dataframe
                 this_df = pd.DataFrame(
-                    {'ID': subj_id, 'Chroma': chroma, 'Condition': epoch, 'Value': avg_val}, index=[0])
+                    {'ID': subj_id, 'Chroma': chroma, 'Condition': epoch, 'Value': value}, index=[0])
                 df = pd.concat([df, this_df], ignore_index=True)
 
     df['Value'] = pd.to_numeric(df['Value'])  # some Pandas have this as object
+    return df
+
+
+def extract_channel_values(all_epochs, tmin = None, tmax = None):
+    """
+    Takes in the all_epochs dict and returns a dataframe with the average hemoglobin concentration
+    per channel in each condition.
+    """
+    #TODO: This is a really ugly function. Four nested for loops is pretty bad.
+    # We'll have to come back to this to see if we can make it less of fuster cluck
+    row_names = {}
+    df = pd.DataFrame()
+    df_row_number = 0
+    for id, event_type in enumerate(all_epochs):
+        # Goes through all the epochs generated for the type of task, like "Control"
+        for epoch_index, epoch in enumerate(all_epochs[event_type]):
+        
+            # If no tmin and tmax is given we use the event triggers to delineate the event duration
+            if tmin == None and tmax == None:
+                tmin = epoch.times[0]
+                tmax = epoch.times[-1]
+
+            # Establish were the event occured and crop the rest
+            data = epoch.get_data(tmin=tmin, tmax=tmax)
+            # test = epoch.to_data_frame()
+            if len(epoch.events) >= 1:
+                channel_averages = []
+                # Loop through each channel and extract the data from that channel
+                for channel_index, channel_name in enumerate(epoch.ch_names):
+                    # Get the average reading for the channel
+                    average = data[:, channel_index, :].mean() * 1.0e6
+                    channel_averages.append(average)
+                # Create a dataframe to store the channel averages.
+                # channel_data[f'{event_type}-{id}'] = channel_averages
+                this_df = pd.DataFrame(np.array(channel_averages).reshape(1,-1), columns=epoch.ch_names)        
+                # print(this_df)
+                df = pd.concat([df, this_df], ignore_index=True)
+                # Create a dictionary of row names in order to rename the dataframe indexs
+                row_names[df_row_number] = f'{event_type}-{epoch_index + 1}'
+                df_row_number += 1
+    # Convert indexes to names for ease of use later.
+    df = df.rename(index=row_names)
     return df
