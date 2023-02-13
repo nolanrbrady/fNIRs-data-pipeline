@@ -48,4 +48,36 @@ def create_design_matrix(all_data):
         print(data)
     
     return updated_data
+
+
+def create_glm_df(glm_data, columns_for_contrast=None):
+    df_cha = pd.DataFrame() # Stores channel level results
+    df_con = pd.DataFrame() # Stores channel level contrast results
+    for data in glm_data:
+        raw_haemo = data['raw_haemo']
+        design_matrix = data['design_matrix']
+
+        # Convert GLM into a Dataframe
+        glm_est = run_glm(raw_haemo, design_matrix)
+        cha = glm_est.to_dataframe()
+
+        if columns_for_contrast:
+            # Define the GLM contrast that is to be evaluated
+            contrast_matrix = np.eye(design_matrix.shape[1])
+            
+            basic_conts = dict([(column, contrast_matrix[i])for i, column in enumerate(design_matrix.columns)])
+            column_1 = columns_for_contrast[0]
+            column_2 = columns_for_contrast[-1]
+            contrast_LvR = basic_conts[column_1] - basic_conts[column_2]
+
+            # Compute defined contrast
+            contrast = glm_est.compute_contrast(contrast_LvR)
+            con = contrast.to_dataframe()
+
+            df_con = pd.concat([df_con, con], ignore_index=True)
+
         
+
+        df_cha = pd.concat([df_cha, cha], ignore_index=True)
+        
+    return df_cha, df_con
