@@ -101,7 +101,10 @@ def aggregate_epochs(paths, trigger_id, variable_epoch_time):
 
     """
     all_epochs = defaultdict(list)
+    # Temporary storage for the items we're using in all_data_df
+    all_data = []
 
+    columns = ['raw_haemo'] # 'epoch', 'condition', 
 
     for f_path in paths:
 
@@ -109,8 +112,20 @@ def aggregate_epochs(paths, trigger_id, variable_epoch_time):
         for epoch in epochs:
             for cidx, condition in enumerate(epoch.event_id):
                 all_epochs[condition].append(epoch[condition])
+                epoch_data = {
+                    'epoch': epoch,
+                    'condition': condition,
+                    'raw_haemo': raw_haemo
+                }
+                
+                all_data.append(epoch_data)
+
+    #TODO: raw_haemo throws a weird error when you try to put it into the dataframe
+    # dataframe would be better but 
+    # all_data_df = pd.DataFrame(all_data)
+    # print(all_data_df)
     
-    return all_epochs
+    return all_epochs, all_data
 
 
 def extract_all_amplitudes(all_epochs, tmin=False, tmax=False):

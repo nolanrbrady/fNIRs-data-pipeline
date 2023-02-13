@@ -21,9 +21,10 @@ import numpy as np
 
 def epoch_generation(raw_haemo, event_dict, events):
     all_epochs = []
+    #TODO: Need to figure out how to make this dynamic
     adjusted_dict = { 1: {'Practice': 1},
         2: {'Neutral': 2},
-        3: {'Inflammatory': 3},
+        3: {'Inflam': 3},
         4: {'Control': 4}}
 
     for index, event in enumerate(events):
