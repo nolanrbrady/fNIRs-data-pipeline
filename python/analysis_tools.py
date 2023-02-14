@@ -266,3 +266,9 @@ def extract_channel_values(all_epochs, tmin = None, tmax = None):
     # Convert indexes to names for ease of use later.
     df = df.rename(index=row_names)
     return df
+
+
+def find_significant_channels(df_cha):
+    mask = df_cha['Significant'] == True
+    sig_df = df_cha[mask]
+    return sig_df
