@@ -81,3 +81,11 @@ def create_glm_df(glm_data, columns_for_contrast=None):
         df_cha = pd.concat([df_cha, cha], ignore_index=True)
         
     return df_cha, df_con
+
+
+def group_level_glm_analysis(df_cha, columns_for_group_analysis):
+    grp_results = df_cha.query(f"Condition in {columns_for_group_analysis}")
+    #TODO: Need to figure out what kind of formula works best here
+    formula = 'theta ~ Condition + Chroma + Condition:Chroma'
+    model = smf.mixedlm(formula, grp_results, groups=grp_results["Condition"]).fit(method='nm')
+    return model
