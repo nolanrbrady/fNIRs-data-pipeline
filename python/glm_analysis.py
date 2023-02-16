@@ -32,8 +32,7 @@ import seaborn as sns
 def create_design_matrix(all_data):
     updated_data = []
     for data in all_data:
-        epoch, condition, raw_haemo = data.values()
-        print(raw_haemo)
+        epoch, condition, raw_haemo, raw_intensity, f_path = data.values()
         events, event_dict = events_from_annotations(raw_haemo, verbose=False)
         
         for event in events:
@@ -41,11 +40,9 @@ def create_design_matrix(all_data):
             prev_event_time = events[-2][0]
             current_event_time = events[-1][0]
             task_len = current_event_time - prev_event_time
-        print(task_len)
         design_matrix = make_first_level_design_matrix(raw_haemo, stim_dur=task_len)
         data['design_matrix'] = design_matrix
         updated_data.append(data)
-        print(data)
     
     return updated_data
 
@@ -53,6 +50,7 @@ def create_design_matrix(all_data):
 def create_glm_df(glm_data, columns_for_contrast=None):
     df_cha = pd.DataFrame() # Stores channel level results
     df_con = pd.DataFrame() # Stores channel level contrast results
+
     for data in glm_data:
         raw_haemo = data['raw_haemo']
         design_matrix = data['design_matrix']
@@ -61,6 +59,7 @@ def create_glm_df(glm_data, columns_for_contrast=None):
         glm_est = run_glm(raw_haemo, design_matrix)
         cha = glm_est.to_dataframe()
 
+        # If contrasting is needed it will be done here
         if columns_for_contrast:
             # Define the GLM contrast that is to be evaluated
             contrast_matrix = np.eye(design_matrix.shape[1])

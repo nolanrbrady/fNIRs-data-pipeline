@@ -82,7 +82,7 @@ def individual_analysis(bids_path, trigger_id, variable_epoch_time, custom_trigg
         # of the data remains the same.
         epochs = [epochs]
 
-    return epochs, raw_haemo
+    return epochs, raw_haemo, raw_intensity, bids_path
 
 
 def aggregate_epochs(paths, trigger_id, variable_epoch_time):
@@ -108,14 +108,16 @@ def aggregate_epochs(paths, trigger_id, variable_epoch_time):
 
     for f_path in paths:
 
-        epochs, raw_haemo = individual_analysis(f_path, trigger_id, variable_epoch_time)
+        epochs, raw_haemo, raw_intensity, path = individual_analysis(f_path, trigger_id, variable_epoch_time)
         for epoch in epochs:
             for cidx, condition in enumerate(epoch.event_id):
                 all_epochs[condition].append(epoch[condition])
                 epoch_data = {
                     'epoch': epoch,
                     'condition': condition,
-                    'raw_haemo': raw_haemo
+                    'raw_haemo': raw_haemo,
+                    'raw_intensity': raw_intensity,
+                    'f_path': path
                 }
                 
                 all_data.append(epoch_data)
@@ -171,7 +173,6 @@ def extract_all_amplitudes(all_epochs, tmin=False, tmax=False):
                 temporal_measurements.append(value)
     
     temporal_measurements = np.array(temporal_measurements)
-    print(temporal_measurements.shape)
     measurement_df = pd.DataFrame(temporal_measurements)
 
     return measurement_df

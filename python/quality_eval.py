@@ -58,7 +58,7 @@ def signal_preprocessing(raw_intensity):
     raw_od.info["bads"] = list(compress(raw_od.ch_names, sci < 0.5))
 
     # TODO: Interpolate bads has caused issues in the past but is needed to clean the bad channels.
-    raw_od.interpolate_bads()
+    # raw_od.interpolate_bads()
 
     # Downsample and apply signal cleaning techniques
     raw_od.resample(0.8)
