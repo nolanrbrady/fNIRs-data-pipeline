@@ -29,7 +29,7 @@ import matplotlib as mpl
 import seaborn as sns
 
 
-def create_design_matrix(all_data):
+def create_design_matrix(all_data, tmin=None, tmax=None):
     updated_data = []
     for data in all_data:
         epoch, condition, raw_haemo, raw_intensity, f_path = data.values()
@@ -37,9 +37,14 @@ def create_design_matrix(all_data):
         
         for event in events:
             # Dynamically establish the task length
-            prev_event_time = events[-2][0]
-            current_event_time = events[-1][0]
-            task_len = current_event_time - prev_event_time
+            print(tmin, tmax)
+            if tmin and tmax:
+                task_len = tmax
+            else:
+                prev_event_time = events[-2][0]
+                current_event_time = events[-1][0]
+                task_len = current_event_time - prev_event_time
+                print(task_len)
         design_matrix = make_first_level_design_matrix(raw_haemo, stim_dur=task_len)
         data['design_matrix'] = design_matrix
         updated_data.append(data)
