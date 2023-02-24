@@ -32,12 +32,12 @@ import seaborn as sns
 def create_design_matrix(all_data, tmin=None, tmax=None):
     updated_data = []
     for data in all_data:
-        epoch, condition, raw_haemo, raw_intensity, f_path = data.values()
+        print(data)
+        epoch, condition, raw_haemo, raw_intensity, f_path, ID = data.values()
         events, event_dict = events_from_annotations(raw_haemo, verbose=False)
         
         for event in events:
             # Dynamically establish the task length
-            print(tmin, tmax)
             if tmin and tmax:
                 task_len = tmax
             else:
@@ -59,10 +59,12 @@ def create_glm_df(glm_data, columns_for_contrast=None):
     for data in glm_data:
         raw_haemo = data['raw_haemo']
         design_matrix = data['design_matrix']
+        sub_id = data['ID']
 
         # Convert GLM into a Dataframe
         glm_est = run_glm(raw_haemo, design_matrix)
         cha = glm_est.to_dataframe()
+        cha['ID'] = sub_id
 
         # If contrasting is needed it will be done here
         if columns_for_contrast:
@@ -77,6 +79,7 @@ def create_glm_df(glm_data, columns_for_contrast=None):
             # Compute defined contrast
             contrast = glm_est.compute_contrast(contrast_LvR)
             con = contrast.to_dataframe()
+            con['ID'] = sub_id
 
             df_con = pd.concat([df_con, con], ignore_index=True)
 
