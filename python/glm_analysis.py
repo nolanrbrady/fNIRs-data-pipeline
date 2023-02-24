@@ -32,7 +32,6 @@ import seaborn as sns
 def create_design_matrix(all_data, tmin=None, tmax=None):
     updated_data = []
     for data in all_data:
-        print(data)
         epoch, condition, raw_haemo, raw_intensity, f_path, ID = data.values()
         events, event_dict = events_from_annotations(raw_haemo, verbose=False)
         

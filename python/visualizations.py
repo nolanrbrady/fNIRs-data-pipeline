@@ -30,8 +30,16 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 import seaborn as sns
 
-def group_topological_visualisation(df_cha):
-    print("Need to get this working")
+def group_topological_visualisation(df_cha, columns_for_glm_contrast, raw_haemo):
+    grp_results = df_cha.query("Condition in ['Control', 'Inflam', 'Neutral']")
+    grp_results = grp_results.query("Chroma in ['hbo']")
+    # print(grp_results)
+    cha_model = smf.mixedlm("theta ~ -1 + Condition", grp_results, groups=grp_results["ID"]).fit(method='nm')
+    
+    df = statsmodels_to_results(cha_model)
+    print(df)
+
+    sns.catplot(x="Condition", y="Coef.", hue="Significant", data=df, ci=None, palette="muted", height=4, s=10)
 
 
 def group_cortical_surface_projection(sub_dir, raw_haemo):
