@@ -64,7 +64,7 @@ def individual_analysis(bids_path, trigger_id, variable_epoch_time, custom_trigg
         print('We need to add code to handle custom triggers')
     else:
         events, event_dict = events_from_annotations(raw_haemo, verbose=False)
-
+        print("Events", events[3])
     # Logic splits here since there are fundamental differences in how we handle Epoch
     # generation in dynamic intervals instead of block intervals.
     if variable_epoch_time:
@@ -104,11 +104,15 @@ def aggregate_epochs(paths, trigger_id, variable_epoch_time):
     # Temporary storage for the items we're using in all_data_df
     all_data = []
 
-    columns = ['raw_haemo'] # 'epoch', 'condition', 
-
     for f_path in paths:
 
         epochs, raw_haemo, raw_intensity, path = individual_analysis(f_path, trigger_id, variable_epoch_time)
+
+        # Find subject ID from the f_path
+        ls = f_path.split('/')
+        res = list(filter(lambda a: 'sub' in a, ls))
+        sub_id = int(res[0].split('-')[-1])
+        
         for epoch in epochs:
             for cidx, condition in enumerate(epoch.event_id):
                 all_epochs[condition].append(epoch[condition])
@@ -117,7 +121,8 @@ def aggregate_epochs(paths, trigger_id, variable_epoch_time):
                     'condition': condition,
                     'raw_haemo': raw_haemo,
                     'raw_intensity': raw_intensity,
-                    'f_path': path
+                    'f_path': path,
+                    'ID': sub_id
                 }
                 
                 all_data.append(epoch_data)
