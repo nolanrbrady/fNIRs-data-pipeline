@@ -2,14 +2,12 @@
 # Import MNE-NIRS processing
 import mne
 from mne_nirs.channels import get_long_channels
-from mne_nirs.channels import picks_pair_to_idx
 from mne_nirs.datasets import fnirs_motor_group
 from mne_nirs.signal_enhancement import enhance_negative_correlation
 
 # Import MNE processing
-from mne.viz import plot_compare_evokeds
 from mne import Epochs, events_from_annotations, set_log_level
-from mne.filter import resample
+from mne_nirs.statistics import statsmodels_to_results
 
 # Other Tooling
 import pandas as pd
@@ -20,6 +18,7 @@ from copy import deepcopy
 from itertools import compress
 import matplotlib.pyplot as plt
 import importlib
+import statsmodels.formula.api as smf
 
 
 # Local functions
@@ -112,7 +111,7 @@ def aggregate_epochs(paths, trigger_id, variable_epoch_time):
         ls = f_path.split('/')
         res = list(filter(lambda a: 'sub' in a, ls))
         sub_id = int(res[0].split('-')[-1])
-        
+
         for epoch in epochs:
             for cidx, condition in enumerate(epoch.event_id):
                 all_epochs[condition].append(epoch[condition])
@@ -278,3 +277,30 @@ def find_significant_channels(df_cha):
     mask = df_cha['Significant'] == True
     sig_df = df_cha[mask]
     return sig_df
+
+
+def create_results_dataframe(df_cha, columns_for_glm_contrast, raw_haemo):
+    """
+    Returns a dataframe summarizing the significance of all the conditions and channels.
+    """
+    chromas = ['hbo', 'hbr']
+
+    results = {}
+
+    for chroma in chromas:
+        ch_summary = df_cha.query(f"Condition in {columns_for_glm_contrast}")
+        ch_summary = ch_summary.query(f"Chroma in ['{chroma}']")
+
+        # Run group level model and convert to dataframe
+        ch_model = smf.mixedlm("theta ~ -1 + ch_name:Chroma:Condition",
+                            ch_summary, groups=ch_summary["ID"]).fit(method='nm')
+
+        # Here we can use the order argument to ensure the channel name order
+        ch_model_df = statsmodels_to_results(ch_model,
+                                            order=raw_haemo.copy().pick(
+                                                picks=chroma).ch_names)
+        # And make the table prettier
+        ch_model_df.reset_index(drop=True, inplace=True)
+        ch_model_df = ch_model_df.set_index(['ch_name', 'Condition'])
+        results[chroma] = ch_model_df
+    return results
