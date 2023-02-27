@@ -1,6 +1,7 @@
 # Import common libraries
 import numpy as np
 import pandas as pd
+import importlib
 
 # Import MNE processing
 import mne
@@ -30,7 +31,55 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 import seaborn as sns
 
+
+
+
 def group_topological_visualisation(df_cha, columns_for_glm_contrast, raw_haemo):
+    fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(10, 10),
+                         gridspec_kw=dict(width_ratios=[1, 1]))
+
+    # Cut down the dataframe just to the conditions we are interested in
+    ch_summary = df_cha.query("Condition in ['Control', 'Neutral', 'Inflam']")
+    ch_summary = ch_summary.query("Chroma in ['hbo']")
+
+    # Run group level model and convert to dataframe
+    ch_model = smf.mixedlm("theta ~ -1 + ch_name:Condition:Chroma",
+                        ch_summary, groups=ch_summary["ID"]).fit(method='nm')
+
+    ch_model_df = statsmodels_to_results(ch_model)
+
+    # Plot the two conditions
+    plot_glm_group_topo(raw_haemo.copy().pick(picks="hbo"),
+                        ch_model_df.query("Condition in ['Control']"),
+                        colorbar=False, axes=axes[0, 0],
+                        vlim=(0, 20), cmap=mpl.cm.Oranges)
+
+    plot_glm_group_topo(raw_haemo.copy().pick(picks="hbo"),
+                        ch_model_df.query("Condition in ['Inflam']"),
+                        colorbar=True, axes=axes[0, 1],
+                        vlim=(0, 20), cmap=mpl.cm.Oranges)
+
+    # Cut down the dataframe just to the conditions we are interested in
+    ch_summary = df_cha.query("Condition in ['Control', 'Inflam']")
+    ch_summary = ch_summary.query("Chroma in ['hbr']")
+
+    # Run group level model and convert to dataframe
+    ch_model = smf.mixedlm("theta ~ -1 + ch_name:Condition:Chroma",
+                        ch_summary, groups=ch_summary["ID"]).fit(method='nm')
+    ch_model_df = statsmodels_to_results(ch_model)
+
+    # Plot the two conditions
+    plot_glm_group_topo(raw_haemo.copy().pick(picks="hbr"),
+                        ch_model_df.query("Condition in ['Control']"),
+                        colorbar=False, axes=axes[1, 0],
+                        vlim=(-10, 0), cmap=mpl.cm.Blues_r)
+    plot_glm_group_topo(raw_haemo.copy().pick(picks="hbr"),
+                        ch_model_df.query("Condition in ['Inflam']"),
+                        colorbar=True, axes=axes[1, 1],
+                        vlim=(-10, 0), cmap=mpl.cm.Blues_r)
+
+
+def group_plot_visualisation(df_cha, columns_for_glm_contrast, raw_haemo):
     grp_results = df_cha.query("Condition in ['Control', 'Inflam', 'Neutral']")
     grp_results = grp_results.query("Chroma in ['hbo']")
     # print(grp_results)
