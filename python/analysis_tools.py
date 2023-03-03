@@ -100,6 +100,7 @@ def aggregate_epochs(paths, trigger_id, variable_epoch_time):
 
     """
     all_epochs = defaultdict(list)
+    all_evokeds = defaultdict(list)
     # Temporary storage for the items we're using in all_data_df
     all_data = []
 
@@ -115,6 +116,7 @@ def aggregate_epochs(paths, trigger_id, variable_epoch_time):
         for epoch in epochs:
             for cidx, condition in enumerate(epoch.event_id):
                 all_epochs[condition].append(epoch[condition])
+                all_evokeds[condition].append(epoch[condition].average())
                 epoch_data = {
                     'epoch': epoch,
                     'condition': condition,
@@ -131,7 +133,7 @@ def aggregate_epochs(paths, trigger_id, variable_epoch_time):
     # all_data_df = pd.DataFrame(all_data)
     # print(all_data_df)
     
-    return all_epochs, all_data
+    return all_epochs, all_data, all_evokeds
 
 
 def extract_all_amplitudes(all_epochs, tmin=False, tmax=False):

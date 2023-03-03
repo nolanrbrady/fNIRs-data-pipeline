@@ -16,6 +16,7 @@ from mne_nirs.statistics import statsmodels_to_results
 from mne_nirs.channels import get_short_channels, get_long_channels
 from mne_nirs.channels import picks_pair_to_idx
 from mne_nirs.visualisation import plot_glm_group_topo
+from mne.viz import plot_compare_evokeds
 from mne_nirs.datasets import fnirs_motor_group
 from mne_nirs.visualisation import plot_glm_surface_projection
 from mne_nirs.io.fold import fold_channel_specificity
@@ -30,6 +31,7 @@ import statsmodels.formula.api as smf
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import seaborn as sns
+from pprint import pprint
 
 
 
@@ -112,3 +114,22 @@ def group_cortical_surface_projection(df_cha, columns_for_glm_constrast, raw_hae
                                             model_df, clim=clim, view='dorsal',
                                             colorbar=True, size=(800, 700))
         brain.add_text(0.05, 0.95, cond, 'title', font_size=16, color='k')
+
+
+def plot_waveform_analysis(all_evokeds, variable_epoch_time):
+    if variable_epoch_time:
+        return RuntimeError('Waveform Analysis is not possible with variable length tasks')
+    else:
+        # Specify the figure size and limits per chromophore
+        fig, axes = plt.subplots(nrows=1, ncols=len(all_evokeds), figsize=(17, 5))
+        lims = dict(hbo=[-5, 12], hbr=[-5, 12])
+
+        for (pick, color) in zip(['hbo', 'hbr'], ['r', 'b']):
+            for idx, evoked in enumerate(all_evokeds):
+                print(evoked, len(all_evokeds[evoked]))
+                plot_compare_evokeds({evoked: all_evokeds[evoked]}, combine='mean',
+                                    picks=pick, axes=axes[idx], show=False,
+                                    colors=[color], legend=False, ylim=lims, ci=0.95,
+                                    show_sensors=idx == 2)
+                axes[idx].set_title('{}'.format(evoked))
+        axes[0].legend(["Oxyhaemoglobin", "Deoxyhaemoglobin"])
