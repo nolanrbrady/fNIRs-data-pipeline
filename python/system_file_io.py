@@ -31,6 +31,7 @@ def import_data_folder (path, ignored_dirs):
                     - something.snirf
     """
     groups = os.listdir(path)
+    groups = list(filter(lambda group: group not in ignored_dirs, groups))
     columns=['group', 'sub_name', 'snirf_path']
     data = []
 

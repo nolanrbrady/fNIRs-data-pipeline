@@ -2,14 +2,12 @@
 # Import MNE-NIRS processing
 import mne
 from mne_nirs.channels import get_long_channels
-from mne_nirs.channels import picks_pair_to_idx
 from mne_nirs.datasets import fnirs_motor_group
 from mne_nirs.signal_enhancement import enhance_negative_correlation
 
 # Import MNE processing
-from mne.viz import plot_compare_evokeds
 from mne import Epochs, events_from_annotations, set_log_level
-from mne.filter import resample
+from mne_nirs.statistics import statsmodels_to_results
 
 # Other Tooling
 import pandas as pd
@@ -20,6 +18,7 @@ from copy import deepcopy
 from itertools import compress
 import matplotlib.pyplot as plt
 import importlib
+import statsmodels.formula.api as smf
 
 
 # Local functions
@@ -64,7 +63,7 @@ def individual_analysis(bids_path, trigger_id, variable_epoch_time, custom_trigg
         print('We need to add code to handle custom triggers')
     else:
         events, event_dict = events_from_annotations(raw_haemo, verbose=False)
-
+        print("Events", events[3])
     # Logic splits here since there are fundamental differences in how we handle Epoch
     # generation in dynamic intervals instead of block intervals.
     if variable_epoch_time:
@@ -82,7 +81,7 @@ def individual_analysis(bids_path, trigger_id, variable_epoch_time, custom_trigg
         # of the data remains the same.
         epochs = [epochs]
 
-    return epochs, raw_haemo
+    return epochs, raw_haemo, raw_intensity, bids_path
 
 
 def aggregate_epochs(paths, trigger_id, variable_epoch_time):
@@ -101,16 +100,40 @@ def aggregate_epochs(paths, trigger_id, variable_epoch_time):
 
     """
     all_epochs = defaultdict(list)
-
+    all_evokeds = defaultdict(list)
+    # Temporary storage for the items we're using in all_data_df
+    all_data = []
 
     for f_path in paths:
 
-        epochs, raw_haemo = individual_analysis(f_path, trigger_id, variable_epoch_time)
+        epochs, raw_haemo, raw_intensity, path = individual_analysis(f_path, trigger_id, variable_epoch_time)
+
+        # Find subject ID from the f_path
+        ls = f_path.split('/')
+        res = list(filter(lambda a: 'sub' in a, ls))
+        sub_id = int(res[0].split('-')[-1])
+
         for epoch in epochs:
             for cidx, condition in enumerate(epoch.event_id):
                 all_epochs[condition].append(epoch[condition])
+                all_evokeds[condition].append(epoch[condition].average())
+                epoch_data = {
+                    'epoch': epoch,
+                    'condition': condition,
+                    'raw_haemo': raw_haemo,
+                    'raw_intensity': raw_intensity,
+                    'f_path': path,
+                    'ID': sub_id
+                }
+                
+                all_data.append(epoch_data)
+
+    #TODO: raw_haemo throws a weird error when you try to put it into the dataframe
+    # dataframe would be better but 
+    # all_data_df = pd.DataFrame(all_data)
+    # print(all_data_df)
     
-    return all_epochs
+    return all_epochs, all_data, all_evokeds
 
 
 def extract_all_amplitudes(all_epochs, tmin=False, tmax=False):
@@ -156,7 +179,6 @@ def extract_all_amplitudes(all_epochs, tmin=False, tmax=False):
                 temporal_measurements.append(value)
     
     temporal_measurements = np.array(temporal_measurements)
-    print(temporal_measurements.shape)
     measurement_df = pd.DataFrame(temporal_measurements)
 
     return measurement_df
@@ -251,3 +273,36 @@ def extract_channel_values(all_epochs, tmin = None, tmax = None):
     # Convert indexes to names for ease of use later.
     df = df.rename(index=row_names)
     return df
+
+
+def find_significant_channels(df_cha):
+    mask = df_cha['Significant'] == True
+    sig_df = df_cha[mask]
+    return sig_df
+
+
+def create_results_dataframe(df_cha, columns_for_glm_contrast, raw_haemo):
+    """
+    Returns a dataframe summarizing the significance of all the conditions and channels.
+    """
+    chromas = ['hbo', 'hbr']
+
+    results = {}
+
+    for chroma in chromas:
+        ch_summary = df_cha.query(f"Condition in {columns_for_glm_contrast}")
+        ch_summary = ch_summary.query(f"Chroma in ['{chroma}']")
+
+        # Run group level model and convert to dataframe
+        ch_model = smf.mixedlm("theta ~ -1 + ch_name:Chroma:Condition",
+                            ch_summary, groups=ch_summary["ID"]).fit(method='nm')
+
+        # Here we can use the order argument to ensure the channel name order
+        ch_model_df = statsmodels_to_results(ch_model,
+                                            order=raw_haemo.copy().pick(
+                                                picks=chroma).ch_names)
+        # And make the table prettier
+        ch_model_df.reset_index(drop=True, inplace=True)
+        ch_model_df = ch_model_df.set_index(['ch_name', 'Condition'])
+        results[chroma] = ch_model_df
+    return results
