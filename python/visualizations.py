@@ -36,13 +36,15 @@ from pprint import pprint
 
 
 
-def group_topological_visualisation(df_cha, columns_for_glm_contrast, raw_haemo):
+def group_topological_visualisation(df_cha, columns_for_glm_contrast, raw_haemo, group):
     chromas = ['hbo', 'hbr']
     conditions = len(columns_for_glm_contrast)
     ratios = [1 for i in range(conditions)]
 
     fig, axes = plt.subplots(nrows=2, ncols=conditions, figsize=(10, 10),
                          gridspec_kw=dict(width_ratios=ratios))
+    
+    fig.suptitle(group.capitalize(), fontsize=20)
     
     for chroma_id, chroma in enumerate(chromas):
         cmap_color = mpl.cm.Oranges if chroma == 'hbo' else mpl.cm.Blues_r
@@ -60,12 +62,9 @@ def group_topological_visualisation(df_cha, columns_for_glm_contrast, raw_haemo)
 
         ch_model_df['Coef.'] = ch_model_df['Coef.'] * 1e7 
 
-        print(ch_model_df['Coef.'])
-
         for condition_id, condition in enumerate(columns_for_glm_contrast):
             color_bar = True if condition_id + 1 == len(columns_for_glm_contrast) else False
             # Plot the condition
-            print("PLOT GLM GROUP TOPO FIRING")
             plot_glm_group_topo(raw_haemo.copy().pick(picks=chroma),
                                 ch_model_df.query(f"Condition in ['{condition}']"),
                                 colorbar=color_bar, axes=axes[chroma_id, condition_id],

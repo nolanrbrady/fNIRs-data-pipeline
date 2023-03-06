@@ -276,10 +276,19 @@ def extract_channel_values(all_epochs, tmin = None, tmax = None):
     return df
 
 
-def find_significant_channels(df_cha):
-    mask = df_cha['Significant'] == True
-    sig_df = df_cha[mask]
-    return sig_df
+def find_significant_channels(ch_model_df, adjust_coef=False):
+    keys = list(ch_model_df.keys())
+    all_sig_channels = pd.DataFrame()
+
+    for key in keys:
+        data = ch_model_df[key]
+        mask = data['Significant'] == True
+        sig_df = data[mask]
+        if adjust_coef:
+            sig_df['Coef.'] = sig_df['Coef.']*1e7
+        all_sig_channels = all_sig_channels.append(sig_df)
+
+    return all_sig_channels
 
 
 def create_results_dataframe(df_cha, columns_for_glm_contrast, raw_haemo):

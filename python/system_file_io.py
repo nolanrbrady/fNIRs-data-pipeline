@@ -63,8 +63,3 @@ def make_snirf_path(dir,sub_path):
         if target in file:
             snirf_path = f'{sub_path}/{file}'
             return snirf_path
-
-
-def download_as_csv(df):
-    print("Beep boop I don't work yet...")
-            
