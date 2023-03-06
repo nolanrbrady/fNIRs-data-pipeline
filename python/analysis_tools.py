@@ -49,8 +49,9 @@ def individual_analysis(bids_path, trigger_id, variable_epoch_time, custom_trigg
 
     raw_intensity = get_long_channels(raw_intensity, min_dist=0.01)
     
-    # Rename the numeric triggers for ease of processing later
-    raw_intensity.annotations.rename(trigger_id)
+    if trigger_id:
+        # Rename the numeric triggers for ease of processing later
+        raw_intensity.annotations.rename(trigger_id)
 
     raw_haemo = quality_eval.signal_preprocessing(raw_intensity)
 

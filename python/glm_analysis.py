@@ -44,6 +44,8 @@ def create_design_matrix(all_data, tmin=None, tmax=None):
                 current_event_time = events[-1][0]
                 task_len = current_event_time - prev_event_time
                 print(task_len)
+        print("Event", event, task_len)
+        #TODO: If it fails here I think it's because the trigger id's need to be renamed.
         design_matrix = make_first_level_design_matrix(raw_haemo, stim_dur=task_len)
         data['design_matrix'] = design_matrix
         updated_data.append(data)
@@ -65,11 +67,12 @@ def create_glm_df(glm_data, columns_for_contrast=None):
         cha = glm_est.to_dataframe()
         cha['ID'] = sub_id
 
+        # glm_est.surface_projection()
         # If contrasting is needed it will be done here
         if columns_for_contrast:
             # Define the GLM contrast that is to be evaluated
             contrast_matrix = np.eye(design_matrix.shape[1])
-            
+            print("Columns in Design matrix", design_matrix.columns)
             basic_conts = dict([(column, contrast_matrix[i])for i, column in enumerate(design_matrix.columns)])
             column_1 = columns_for_contrast[0]
             column_2 = columns_for_contrast[-1]

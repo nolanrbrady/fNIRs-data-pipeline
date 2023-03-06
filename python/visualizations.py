@@ -58,13 +58,19 @@ def group_topological_visualisation(df_cha, columns_for_glm_contrast, raw_haemo)
 
         ch_model_df = statsmodels_to_results(ch_model)
 
+        ch_model_df['Coef.'] = ch_model_df['Coef.'] * 1e7 
+
+        print(ch_model_df['Coef.'])
+
         for condition_id, condition in enumerate(columns_for_glm_contrast):
             color_bar = True if condition_id + 1 == len(columns_for_glm_contrast) else False
             # Plot the condition
+            print("PLOT GLM GROUP TOPO FIRING")
             plot_glm_group_topo(raw_haemo.copy().pick(picks=chroma),
                                 ch_model_df.query(f"Condition in ['{condition}']"),
                                 colorbar=color_bar, axes=axes[chroma_id, condition_id],
-                                vlim=vlim, cmap=cmap_color)
+                                vlim=vlim, cmap=cmap_color, threshold=True)
+    plt.show()
 
 
 
@@ -133,3 +139,4 @@ def plot_waveform_analysis(all_evokeds, variable_epoch_time):
                                     show_sensors=idx == 2)
                 axes[idx].set_title('{}'.format(evoked))
         axes[0].legend(["Oxyhaemoglobin", "Deoxyhaemoglobin"])
+    plt.show()
