@@ -19,6 +19,7 @@ from itertools import compress
 import matplotlib.pyplot as plt
 import importlib
 import statsmodels.formula.api as smf
+import statsmodels as sm
 
 
 # Local functions
@@ -28,7 +29,8 @@ import dynamic_interval_tools
 importlib.reload(quality_eval)
 importlib.reload(dynamic_interval_tools)
 
-def individual_analysis(bids_path, trigger_id, variable_epoch_time, custom_triggers = False):
+
+def individual_analysis(bids_path, trigger_id, variable_epoch_time, custom_triggers=False):
     """
     TLDR:
         This function takes in the file path to the BIDS directory and the dictionary that renames numeric triggers.
@@ -45,10 +47,11 @@ def individual_analysis(bids_path, trigger_id, variable_epoch_time, custom_trigg
     """
     # Read data with annotations in BIDS format
     # raw_intensity = read_raw_bids(bids_path=bids_path, verbose=False)
-    raw_intensity = mne.io.read_raw_snirf(bids_path, verbose=True, preload=False)
+    raw_intensity = mne.io.read_raw_snirf(
+        bids_path, verbose=True, preload=False)
 
     raw_intensity = get_long_channels(raw_intensity, min_dist=0.01)
-    
+
     if trigger_id:
         # Rename the numeric triggers for ease of processing later
         raw_intensity.annotations.rename(trigger_id)
@@ -58,22 +61,22 @@ def individual_analysis(bids_path, trigger_id, variable_epoch_time, custom_trigg
     # Apply further data cleaning techniques and extract epochs
     raw_haemo = enhance_negative_correlation(raw_haemo)
 
-    
     if custom_triggers:
         # TODO: Need to add something here to be able to work in custom triggers
         print('We need to add code to handle custom triggers')
     else:
         events, event_dict = events_from_annotations(raw_haemo, verbose=False)
-        print("Events", events[3])
+        # print("Events", events[3])
     # Logic splits here since there are fundamental differences in how we handle Epoch
     # generation in dynamic intervals instead of block intervals.
     if variable_epoch_time:
-        epochs = dynamic_interval_tools.epoch_generation(raw_haemo, event_dict, events)
+        epochs = dynamic_interval_tools.epoch_generation(
+            raw_haemo, event_dict, events)
     else:
         # Remove all STOP triggers to hardcode duration to 30 secs per MNE specs
-        #TODO: We'll need to remove this for all other datasets
-        events = events[::2]
-        
+        # TODO: Need a prompt for end triggers present. If NOT present skip this part.
+        # events = events[::2]
+
         epochs = Epochs(raw_haemo, events, event_id=event_dict, tmin=-1, tmax=15,
                         reject=dict(hbo=200e-6), reject_by_annotation=True,
                         proj=True, baseline=(None, 0), detrend=0,
@@ -107,7 +110,8 @@ def aggregate_epochs(paths, trigger_id, variable_epoch_time):
 
     for f_path in paths:
 
-        epochs, raw_haemo, raw_intensity, path = individual_analysis(f_path, trigger_id, variable_epoch_time)
+        epochs, raw_haemo, raw_intensity, path = individual_analysis(
+            f_path, trigger_id, variable_epoch_time)
 
         # Find subject ID from the f_path
         ls = f_path.split('/')
@@ -126,14 +130,14 @@ def aggregate_epochs(paths, trigger_id, variable_epoch_time):
                     'f_path': path,
                     'ID': sub_id
                 }
-                
+
                 all_data.append(epoch_data)
 
-    #TODO: raw_haemo throws a weird error when you try to put it into the dataframe
-    # dataframe would be better but 
+    # TODO: raw_haemo throws a weird error when you try to put it into the dataframe
+    # dataframe would be better but
     # all_data_df = pd.DataFrame(all_data)
     # print(all_data_df)
-    
+
     return all_epochs, all_data, all_evokeds
 
 
@@ -160,7 +164,7 @@ def extract_all_amplitudes(all_epochs, tmin=False, tmax=False):
 
     """
     temporal_measurements = []
-    
+
     for idx, epoch in enumerate(all_epochs):
         subj_id = 0
         for subj_data in all_epochs[epoch]:
@@ -172,13 +176,13 @@ def extract_all_amplitudes(all_epochs, tmin=False, tmax=False):
                 if tmin == False and tmax == False:
                     tmin = subj_data.times[0]
                     tmax = subj_data.times[-1]
-                
+
                 value = data.crop(tmin=tmin, tmax=tmax).data * 1.0e6
                 # Reshape the data to be a flat numpy array
                 value = np.reshape(value, -1)
-                
+
                 temporal_measurements.append(value)
-    
+
     temporal_measurements = np.array(temporal_measurements)
     measurement_df = pd.DataFrame(temporal_measurements)
 
@@ -234,12 +238,12 @@ def extract_average_amplitudes(all_epochs, tmin=None, tmax=None):
     return df
 
 
-def extract_channel_values(all_epochs, tmin = None, tmax = None):
+def extract_channel_values(all_epochs, tmin=None, tmax=None):
     """
     Takes in the all_epochs dict and returns a dataframe with the average hemoglobin concentration
     per channel in each condition.
     """
-    #TODO: This is a really ugly function. Four nested for loops is pretty bad.
+    # TODO: This is a really ugly function. Four nested for loops is pretty bad.
     # We'll have to come back to this to see if we can make it less of fuster cluck
     row_names = {}
     df = pd.DataFrame()
@@ -247,7 +251,7 @@ def extract_channel_values(all_epochs, tmin = None, tmax = None):
     for id, event_type in enumerate(all_epochs):
         # Goes through all the epochs generated for the type of task, like "Control"
         for epoch_index, epoch in enumerate(all_epochs[event_type]):
-        
+
             # If no tmin and tmax is given we use the event triggers to delineate the event duration
             if tmin == None and tmax == None:
                 tmin = epoch.times[0]
@@ -265,7 +269,8 @@ def extract_channel_values(all_epochs, tmin = None, tmax = None):
                     channel_averages.append(average)
                 # Create a dataframe to store the channel averages.
                 # channel_data[f'{event_type}-{id}'] = channel_averages
-                this_df = pd.DataFrame(np.array(channel_averages).reshape(1,-1), columns=epoch.ch_names)        
+                this_df = pd.DataFrame(np.array(channel_averages).reshape(
+                    1, -1), columns=epoch.ch_names)
                 # print(this_df)
                 df = pd.concat([df, this_df], ignore_index=True)
                 # Create a dictionary of row names in order to rename the dataframe indexs
@@ -305,14 +310,72 @@ def create_results_dataframe(df_cha, columns_for_glm_contrast, raw_haemo):
 
         # Run group level model and convert to dataframe
         ch_model = smf.mixedlm("theta ~ -1 + ch_name:Chroma:Condition",
-                            ch_summary, groups=ch_summary["ID"]).fit(method='nm')
+                               ch_summary, groups=ch_summary["ID"]).fit(method='nm')
 
         # Here we can use the order argument to ensure the channel name order
         ch_model_df = statsmodels_to_results(ch_model,
-                                            order=raw_haemo.copy().pick(
-                                                picks=chroma).ch_names)
+                                             order=raw_haemo.copy().pick(
+                                                 picks=chroma).ch_names)
         # And make the table prettier
         ch_model_df.reset_index(drop=True, inplace=True)
         ch_model_df = ch_model_df.set_index(['ch_name', 'Condition'])
         results[chroma] = ch_model_df
     return results
+
+
+def false_discovery_rate_correction(df, ignore):
+    channels = pd.Series(df['ch_name'].unique())
+    conditions = pd.Series(df['Condition'].unique())
+
+    fdr_valid_channels = pd.DataFrame()
+
+    for channel in channels:
+        ch_df = df.loc[df['ch_name'] == channel]
+
+        # Remove the drift columns
+        for item in ignore:
+            ch_df = ch_df.loc[~ch_df['Condition'].str.contains(item)]
+
+        condition_channels = pd.DataFrame()
+        for condition in conditions:
+            
+            if (condition not in ignore) and (condition.find('drift') != False):
+                # Isolate the one condition for the one channel
+                condition_df = ch_df.loc[ch_df['Condition'] == condition]
+
+                # Select only the numeric columns
+                numeric_columns = condition_df.select_dtypes(
+                    include=[float, int])
+                non_numeric_columns = condition_df.select_dtypes(exclude=[
+                                                                 float, int])
+
+                # Calculate the mean of each numeric column
+                column_means = numeric_columns.mean()
+
+                # Create a new DataFrame to store the column means in one row
+                df_means = pd.DataFrame(column_means).T
+                df_numeric = non_numeric_columns.head(1)
+
+                # Isolate the fields we care about
+                ch_name = df_numeric['ch_name'].iloc[0]
+                chroma = df_numeric['Chroma'].iloc[0]
+                condition = df_numeric['Condition'].iloc[0]
+
+                # Add variables to the means
+                df_means['ch_name'] = ch_name
+                df_means['Chroma'] = chroma
+                df_means['Condition'] = condition
+
+                condition_channels = pd.concat([df_means, condition_channels], ignore_index=True)
+
+            # # Perform two-sample t-test on the conditions to see if they're different
+            print('Condition channel length', len(condition_channels))
+            if len(condition_channels) > 1:
+                cond1 = condition_channels['p_value'][0]
+                cond2 = condition_channels['p_value'][1]
+
+                # Run the T-test to compare the conditions
+                result = sm.stats.ttest_ind(cond1, cond2)
+                print(result)
+
+    return condition_channels

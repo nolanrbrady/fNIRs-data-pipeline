@@ -89,7 +89,7 @@ def create_glm_df(glm_data, columns_for_contrast=None):
 
         df_cha = pd.concat([df_cha, cha], ignore_index=True)
         
-    return df_cha, df_con
+    return df_cha, df_con, glm_est
 
 
 def group_level_glm_analysis(df_cha, columns_for_group_analysis):
