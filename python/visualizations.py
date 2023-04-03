@@ -36,6 +36,7 @@ from pprint import pprint
 
 
 
+
 def group_topological_visualisation(df_cha, columns_for_glm_contrast, raw_haemo, group, fdr_correction=False):
     chromas = ['hbo', 'hbr']
     conditions = len(columns_for_glm_contrast)
@@ -63,16 +64,30 @@ def group_topological_visualisation(df_cha, columns_for_glm_contrast, raw_haemo,
         ch_model_df['Coef.'] = ch_model_df['Coef.'] * 1e7 
         for condition_id, condition in enumerate(columns_for_glm_contrast):
             color_bar = True if condition_id + 1 == len(columns_for_glm_contrast) else False
-            #TODO: Seems like having a bad channel breaks the pathway here.
-            # model_data = ch_model_df.query(f"Condition in ['{condition}']").head(17)
             model_data = ch_model_df.query(f"Condition in ['{condition}']")
-            bad_channels = raw_haemo.info['bads']
 
+            # Makes sure the numbers are float64
+            float_vals = ['Coef.', 'Std.Err.', 'z', 'P>|z|', '[0.025', '0.975]']
+            for vals in float_vals:
+                # model_data[vals] = pd.to_numeric(model_data[vals])
+                model_data[vals] = model_data[vals].astype(float)
+
+
+            str_vals = ['ch_name', 'Condition', 'Chroma']
+            for vals in str_vals:
+                model_data[vals] = model_data[vals].astype(str)
+
+            bad_channels = raw_haemo.info['bads']
+            print(bad_channels)
             mask = ~model_data['ch_name'].isin(bad_channels)
             model_data = model_data.loc[mask]
+
+            # Drop the bad channels to prevent errors
+            raw = raw_haemo.copy().drop_channels(bad_channels)
             
+        
             # Plot the condition
-            plot_glm_group_topo(raw_haemo.copy().pick(picks=chroma), model_data,
+            plot_glm_group_topo(raw.copy().pick(picks=chroma), model_data,
                                 colorbar=color_bar, axes=axes[chroma_id, condition_id],
                                 vlim=vlim, cmap=cmap_color, threshold=True)
     plt.show()
