@@ -60,7 +60,7 @@ def group_topological_visualisation(df_cha, columns_for_glm_contrast, raw_haemo,
                             ch_summary, groups=ch_summary["ID"]).fit(method='nm')
 
         ch_model_df = statsmodels_to_results(ch_model)
-
+        # print(ch_model_df)
         ch_model_df['Coef.'] = ch_model_df['Coef.'] * 1e7 
         for condition_id, condition in enumerate(columns_for_glm_contrast):
             color_bar = True if condition_id + 1 == len(columns_for_glm_contrast) else False
@@ -85,7 +85,7 @@ def group_topological_visualisation(df_cha, columns_for_glm_contrast, raw_haemo,
             # Drop the bad channels to prevent errors
             raw = raw_haemo.copy().drop_channels(bad_channels)
             
-        
+            
             # Plot the condition
             plot_glm_group_topo(raw.copy().pick(picks=chroma), model_data,
                                 colorbar=color_bar, axes=axes[chroma_id, condition_id],
@@ -99,6 +99,9 @@ def group_topological_visualisation_with_fdr(df_cha, raw_haemo):
                          gridspec_kw=dict(width_ratios=[1]))
     
     fig.suptitle("FDR Adjusted", fontsize=20)
+
+    bad_channels = raw_haemo.info['bads']
+    raw = raw_haemo.copy().drop_channels(bad_channels)
     
     for chroma_id, chroma in enumerate(chromas):
         cmap_color = mpl.cm.Oranges if chroma == 'hbo' else mpl.cm.Blues_r

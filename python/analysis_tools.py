@@ -20,6 +20,7 @@ import matplotlib.pyplot as plt
 import importlib
 import statsmodels.formula.api as smf
 import statsmodels as sm
+from scipy import stats
 
 
 # Local functions
@@ -66,6 +67,7 @@ def individual_analysis(bids_path, trigger_id, variable_epoch_time, custom_trigg
         print('We need to add code to handle custom triggers')
     else:
         events, event_dict = events_from_annotations(raw_haemo, verbose=False)
+        print("Events", event_dict, bids_path)
         # print("Events", events[3])
     # Logic splits here since there are fundamental differences in how we handle Epoch
     # generation in dynamic intervals instead of block intervals.
@@ -117,7 +119,7 @@ def aggregate_epochs(paths, trigger_id, variable_epoch_time):
         ls = f_path.split('/')
         res = list(filter(lambda a: 'sub' in a, ls))
         sub_id = int(res[0].split('-')[-1])
-
+        print("sub_id", sub_id)
         for epoch in epochs:
             for cidx, condition in enumerate(epoch.event_id):
                 all_epochs[condition].append(epoch[condition])
@@ -323,7 +325,7 @@ def create_results_dataframe(df_cha, columns_for_glm_contrast, raw_haemo):
     return results
 
 
-def false_discovery_rate_correction(df, ignore):
+def false_discovery_rate_correction(df, ignore, columns_for_fdr):
     channels = pd.Series(df['ch_name'].unique())
     conditions = pd.Series(df['Condition'].unique())
 
@@ -338,8 +340,7 @@ def false_discovery_rate_correction(df, ignore):
 
         condition_channels = pd.DataFrame()
         for condition in conditions:
-            
-            if (condition not in ignore) and (condition.find('drift') != False):
+            if (condition not in ignore) and (condition.find('drift') != False) and (condition in columns_for_fdr):
                 # Isolate the one condition for the one channel
                 condition_df = ch_df.loc[ch_df['Condition'] == condition]
 
@@ -367,15 +368,20 @@ def false_discovery_rate_correction(df, ignore):
                 df_means['Condition'] = condition
 
                 condition_channels = pd.concat([df_means, condition_channels], ignore_index=True)
-
-            # # Perform two-sample t-test on the conditions to see if they're different
-            print('Condition channel length', len(condition_channels))
+            # Perform two-sample t-test on the conditions to see if they're different
             if len(condition_channels) > 1:
                 cond1 = condition_channels['p_value'][0]
                 cond2 = condition_channels['p_value'][1]
+                p_vals = [cond1, cond2]
 
                 # Run the T-test to compare the conditions
-                result = sm.stats.ttest_ind(cond1, cond2)
-                print(result)
+                result = stats.combine_pvalues(p_vals, method='fisher')
 
-    return condition_channels
+                result_pval = result[1]
+                
+                if result_pval <= 0.3:
+                    # print("VALID", condition_channels)
+                    # fdr_valid_channels = fdr_valid_channels.append(condition_channels)
+                    fdr_valid_channels = pd.concat([fdr_valid_channels, condition_channels], ignore_index=True)
+                    
+    return fdr_valid_channels

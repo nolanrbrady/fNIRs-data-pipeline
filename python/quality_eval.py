@@ -55,7 +55,7 @@ def signal_preprocessing(raw_intensity):
 
     # Evaluating the channels for their quality and removing them
     sci = scalp_coupling_index(raw_od, h_freq=1.35, h_trans_bandwidth=0.1)
-    raw_od.info["bads"] = list(compress(raw_od.ch_names, sci < 0.5))
+    raw_od.info["bads"] = list(compress(raw_od.ch_names, sci < 0.8))
 
     # TODO: Interpolate bads has caused issues in the past but is needed to clean the bad channels.
     # raw_od.interpolate_bads()
