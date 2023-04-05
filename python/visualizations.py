@@ -78,16 +78,15 @@ def group_topological_visualisation(df_cha, columns_for_glm_contrast, raw_haemo,
                 model_data[vals] = model_data[vals].astype(str)
 
             bad_channels = raw_haemo.info['bads']
-            print(bad_channels)
             mask = ~model_data['ch_name'].isin(bad_channels)
             model_data = model_data.loc[mask]
 
             # Drop the bad channels to prevent errors
             raw = raw_haemo.copy().drop_channels(bad_channels)
-            
+            ch_names = raw_haemo.ch_names
             
             # Plot the condition
-            plot_glm_group_topo(raw.copy().pick(picks=chroma), model_data,
+            plot_glm_group_topo(raw.copy().pick(picks=chroma), model_data,names=ch_names,
                                 colorbar=color_bar, axes=axes[chroma_id, condition_id],
                                 vlim=vlim, cmap=cmap_color, threshold=True)
     plt.show()
