@@ -172,7 +172,7 @@ def plot_waveform_analysis(all_evokeds, interval_length, variable_epoch_time):
 
         for (pick, color) in zip(['hbo', 'hbr'], ['r', 'b']):
             for idx, evoked in enumerate(all_evokeds):
-                # print(evoked, len(all_evokeds[evoked]))
+                print(all_evokeds[evoked])
                 plot_compare_evokeds({evoked: all_evokeds[evoked]}, combine='mean',
                                     picks=pick, axes=axes[idx], show=False,
                                     colors=[color], legend=False, ylim=lims, ci=0.95,

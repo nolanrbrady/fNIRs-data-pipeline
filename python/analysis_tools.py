@@ -31,7 +31,63 @@ importlib.reload(quality_eval)
 importlib.reload(dynamic_interval_tools)
 
 
-def individual_analysis(bids_path, trigger_id, variable_epoch_time, custom_triggers=False):
+def aggregate_epochs(paths, trigger_id, variable_epoch_time, tmin, tmax):
+    """
+    TLDR:
+        Cycles through the participants in bids folders and returns epochs based on the trigger associated with it
+        This function takes in the root directory, trigger_id dict and ignore parameters.
+        This function returns a dict with the keys being trigger names and the value being an array of epochs.
+
+    Examples of each variables:
+        root_dir ([str]) = ['../../LabResearch/IndependentStudy/DataAnalysis'] generated from import_data_folder function
+        trigger_id (dict) = {'4': 'Control', '2': 'Neutral', '3': 'Inflammatory', '1':'Practice'}
+
+    Documentation:
+        epochs: https://mne.tools/stable/generated/mne.Epochs.html#mne-epochs
+
+    """
+    all_epochs = defaultdict(list)
+    all_evokeds = defaultdict(list)
+    # Temporary storage for the items we're using in all_data_df
+    all_data = []
+
+    for f_path in paths:
+
+        epochs, raw_haemo, raw_intensity, path, events, event_dict = individual_analysis(
+            f_path, trigger_id, variable_epoch_time, tmax)
+
+        # Find subject ID from the f_path
+        ls = f_path.split('/')
+        res = list(filter(lambda a: 'sub' in a, ls))
+        sub_id = int(res[0].split('-')[-1])
+        print("sub_id", sub_id)
+        for epoch in epochs:
+            for cidx, condition in enumerate(epoch.event_id):
+                all_epochs[condition].append(epoch[condition])
+                all_evokeds[condition].append(epoch[condition].average())
+                epoch_data = {
+                    'epoch': epoch,
+                    'condition': condition,
+                    'raw_haemo': raw_haemo,
+                    'raw_intensity': raw_intensity,
+                    'f_path': path,
+                    'ID': sub_id
+                }
+
+                all_data.append(epoch_data)
+    print("EVENTS")
+    print(event_dict)
+    print(events)
+    # TODO: raw_haemo throws a weird error when you try to put it into the dataframe
+    # dataframe would be better but
+    # all_data_df = pd.DataFrame(all_data)
+    # print(all_data_df)
+
+    return all_epochs, all_data, all_evokeds
+
+
+
+def individual_analysis(bids_path, trigger_id, variable_epoch_time, tmax, custom_triggers=False):
     """
     TLDR:
         This function takes in the file path to the BIDS directory and the dictionary that renames numeric triggers.
@@ -69,6 +125,7 @@ def individual_analysis(bids_path, trigger_id, variable_epoch_time, custom_trigg
     else:
         events, event_dict = events_from_annotations(raw_haemo, verbose=False)
         print(events, event_dict)
+
     # Logic splits here since there are fundamental differences in how we handle Epoch
     # generation in dynamic intervals instead of block intervals.
     if variable_epoch_time:
@@ -79,7 +136,7 @@ def individual_analysis(bids_path, trigger_id, variable_epoch_time, custom_trigg
         # TODO: Need a prompt for end triggers present. If NOT present skip this part.
         # events = events[::2]
 
-        epochs = Epochs(raw_haemo, events, event_id=event_dict, tmin=-1, tmax=15,
+        epochs = Epochs(raw_haemo, events, event_id=event_dict, tmin=-1, tmax=tmax,
                         reject=dict(hbo=200e-6), reject_by_annotation=True,
                         proj=True, baseline=(None, 0), detrend=0,
                         preload=True, verbose=False)
@@ -88,61 +145,6 @@ def individual_analysis(bids_path, trigger_id, variable_epoch_time, custom_trigg
         epochs = [epochs]
 
     return epochs, raw_haemo, raw_intensity, bids_path, events, event_dict
-
-
-def aggregate_epochs(paths, trigger_id, variable_epoch_time):
-    """
-    TLDR:
-        Cycles through the participants in bids folders and returns epochs based on the trigger associated with it
-        This function takes in the root directory, trigger_id dict and ignore parameters.
-        This function returns a dict with the keys being trigger names and the value being an array of epochs.
-
-    Examples of each variables:
-        root_dir ([str]) = ['../../LabResearch/IndependentStudy/DataAnalysis'] generated from import_data_folder function
-        trigger_id (dict) = {'4': 'Control', '2': 'Neutral', '3': 'Inflammatory', '1':'Practice'}
-
-    Documentation:
-        epochs: https://mne.tools/stable/generated/mne.Epochs.html#mne-epochs
-
-    """
-    all_epochs = defaultdict(list)
-    all_evokeds = defaultdict(list)
-    # Temporary storage for the items we're using in all_data_df
-    all_data = []
-
-    for f_path in paths:
-
-        epochs, raw_haemo, raw_intensity, path, events, event_dict = individual_analysis(
-            f_path, trigger_id, variable_epoch_time)
-
-        # Find subject ID from the f_path
-        ls = f_path.split('/')
-        res = list(filter(lambda a: 'sub' in a, ls))
-        sub_id = int(res[0].split('-')[-1])
-        print("sub_id", sub_id)
-        for epoch in epochs:
-            for cidx, condition in enumerate(epoch.event_id):
-                all_epochs[condition].append(epoch[condition])
-                all_evokeds[condition].append(epoch[condition].average())
-                epoch_data = {
-                    'epoch': epoch,
-                    'condition': condition,
-                    'raw_haemo': raw_haemo,
-                    'raw_intensity': raw_intensity,
-                    'f_path': path,
-                    'ID': sub_id
-                }
-
-                all_data.append(epoch_data)
-    print("EVENTS")
-    print(event_dict)
-    print(events)
-    # TODO: raw_haemo throws a weird error when you try to put it into the dataframe
-    # dataframe would be better but
-    # all_data_df = pd.DataFrame(all_data)
-    # print(all_data_df)
-
-    return all_epochs, all_data, all_evokeds
 
 
 def extract_all_amplitudes(all_epochs, tmin=False, tmax=False):
