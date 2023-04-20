@@ -54,6 +54,7 @@ def individual_analysis(bids_path, trigger_id, variable_epoch_time, custom_trigg
     raw_intensity = get_long_channels(raw_intensity, min_dist=0.01)
 
     if trigger_id:
+        print(trigger_id)
         # Rename the numeric triggers for ease of processing later
         raw_intensity.annotations.rename(trigger_id)
 
@@ -67,8 +68,7 @@ def individual_analysis(bids_path, trigger_id, variable_epoch_time, custom_trigg
         print('We need to add code to handle custom triggers')
     else:
         events, event_dict = events_from_annotations(raw_haemo, verbose=False)
-        print("Events", event_dict, bids_path)
-        # print("Events", events[3])
+        print(events, event_dict)
     # Logic splits here since there are fundamental differences in how we handle Epoch
     # generation in dynamic intervals instead of block intervals.
     if variable_epoch_time:
@@ -87,7 +87,7 @@ def individual_analysis(bids_path, trigger_id, variable_epoch_time, custom_trigg
         # of the data remains the same.
         epochs = [epochs]
 
-    return epochs, raw_haemo, raw_intensity, bids_path
+    return epochs, raw_haemo, raw_intensity, bids_path, events, event_dict
 
 
 def aggregate_epochs(paths, trigger_id, variable_epoch_time):
@@ -112,7 +112,7 @@ def aggregate_epochs(paths, trigger_id, variable_epoch_time):
 
     for f_path in paths:
 
-        epochs, raw_haemo, raw_intensity, path = individual_analysis(
+        epochs, raw_haemo, raw_intensity, path, events, event_dict = individual_analysis(
             f_path, trigger_id, variable_epoch_time)
 
         # Find subject ID from the f_path
@@ -134,7 +134,9 @@ def aggregate_epochs(paths, trigger_id, variable_epoch_time):
                 }
 
                 all_data.append(epoch_data)
-
+    print("EVENTS")
+    print(event_dict)
+    print(events)
     # TODO: raw_haemo throws a weird error when you try to put it into the dataframe
     # dataframe would be better but
     # all_data_df = pd.DataFrame(all_data)

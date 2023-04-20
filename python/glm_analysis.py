@@ -34,7 +34,7 @@ def create_design_matrix(all_data, tmin=None, tmax=None):
     for data in all_data:
         epoch, condition, raw_haemo, raw_intensity, f_path, ID = data.values()
         events, event_dict = events_from_annotations(raw_haemo, verbose=False)
-        
+        print("GLM Event Dict", event_dict)
         for event in events:
             # Dynamically establish the task length
             if tmin and tmax:

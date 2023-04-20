@@ -41,11 +41,11 @@ def group_topological_visualisation(df_cha, columns_for_glm_contrast, raw_haemo,
     chromas = ['hbo', 'hbr']
     conditions = len(columns_for_glm_contrast)
     ratios = [1 for i in range(conditions)]
-
-    fig, axes = plt.subplots(nrows=2, ncols=conditions, figsize=(10, 10),
-                         gridspec_kw=dict(width_ratios=ratios))
-    
-    fig.suptitle(group.capitalize(), fontsize=20)
+    if conditions >= 2:
+        fig, axes = plt.subplots(nrows=2, ncols=conditions, figsize=(10, 10),
+                            gridspec_kw=dict(width_ratios=ratios))
+        
+        fig.suptitle(group.capitalize(), fontsize=20)
     
     for chroma_id, chroma in enumerate(chromas):
         cmap_color = mpl.cm.Oranges if chroma == 'hbo' else mpl.cm.Blues_r
@@ -62,6 +62,7 @@ def group_topological_visualisation(df_cha, columns_for_glm_contrast, raw_haemo,
         ch_model_df = statsmodels_to_results(ch_model)
         # print(ch_model_df)
         ch_model_df['Coef.'] = ch_model_df['Coef.'] * 1e7 
+
         for condition_id, condition in enumerate(columns_for_glm_contrast):
             color_bar = True if condition_id + 1 == len(columns_for_glm_contrast) else False
             model_data = ch_model_df.query(f"Condition in ['{condition}']")
@@ -77,6 +78,7 @@ def group_topological_visualisation(df_cha, columns_for_glm_contrast, raw_haemo,
             for vals in str_vals:
                 model_data[vals] = model_data[vals].astype(str)
 
+            # Remove the bad channels
             bad_channels = raw_haemo.info['bads']
             mask = ~model_data['ch_name'].isin(bad_channels)
             model_data = model_data.loc[mask]
@@ -85,10 +87,24 @@ def group_topological_visualisation(df_cha, columns_for_glm_contrast, raw_haemo,
             raw = raw_haemo.copy().drop_channels(bad_channels)
             ch_names = raw_haemo.ch_names
             
-            # Plot the condition
-            plot_glm_group_topo(raw.copy().pick(picks=chroma), model_data,names=ch_names,
-                                colorbar=color_bar, axes=axes[chroma_id, condition_id],
-                                vlim=vlim, cmap=cmap_color, threshold=True)
+            # If there are multiple conditions in the study put it all side by side.
+            if conditions >= 2:
+                plot_glm_group_topo(
+                    raw.copy().pick(picks=chroma), 
+                    model_data,
+                    names=ch_names,
+                    colorbar=color_bar, 
+                    axes= axes[chroma_id, condition_id],
+                    vlim=vlim, cmap=cmap_color, threshold=True)
+            # If not just render two seperate graphs
+            else:
+                plot_glm_group_topo(
+                    raw.copy().pick(picks=chroma), 
+                    model_data,
+                    names=ch_names,
+                    colorbar=True,
+                    vlim=vlim, cmap=cmap_color, threshold=True)
+            
     plt.show()
 
 def group_topological_visualisation_with_fdr(df_cha, raw_haemo):
