@@ -162,7 +162,7 @@ def group_cortical_surface_projection(df_cha, columns_for_glm_constrast, raw_hae
     brain.show_view(azimuth=180, elevation=80, distance=450)
 
 
-def plot_waveform_analysis(all_evokeds, interval_length, variable_epoch_time):
+def plot_waveform_analysis(all_evokeds, variable_epoch_time):
     if variable_epoch_time:
         return RuntimeError('Waveform Analysis is not possible with variable length tasks')
     else:
