@@ -16,6 +16,7 @@ from mne_nirs.visualisation import plot_glm_group_topo
 from mne_nirs.datasets import fnirs_motor_group
 from mne_nirs.visualisation import plot_glm_surface_projection
 from mne_nirs.io.fold import fold_channel_specificity
+from nilearn.plotting import plot_design_matrix
 
 # Import MNE-BIDS processing
 from mne_bids import BIDSPath, read_raw_bids, get_entity_vals
@@ -34,7 +35,6 @@ def create_design_matrix(all_data, tmin=None, tmax=None):
     for data in all_data:
         epoch, condition, raw_haemo, raw_intensity, f_path, ID = data.values()
         events, event_dict = events_from_annotations(raw_haemo, verbose=False)
-        print("GLM Event Dict", event_dict)
         for event in events:
             # Dynamically establish the task length
             if tmin and tmax:
@@ -43,11 +43,23 @@ def create_design_matrix(all_data, tmin=None, tmax=None):
                 prev_event_time = events[-2][0]
                 current_event_time = events[-1][0]
                 task_len = current_event_time - prev_event_time
-                print(task_len)
-        print("Event", event, task_len)
+
+        # Find short channels if they are available
+        short_channels = get_short_channels(raw_haemo, max_dist=0.5)
+
         #TODO: If it fails here I think it's because the trigger id's need to be renamed.
         design_matrix = make_first_level_design_matrix(raw_haemo, stim_dur=task_len)
         data['design_matrix'] = design_matrix
+
+        # Check for Short channels and if they're present include them into the design matrix
+        if len(short_channels):
+            design_matrix["ShortHbO"] = np.mean(short_channels.copy().pick(
+                                    picks="hbo").get_data(), axis=0)
+
+            design_matrix["ShortHbR"] = np.mean(short_channels.copy().pick(
+                                                picks="hbr").get_data(), axis=0)
+
+
         updated_data.append(data)
     
     return updated_data

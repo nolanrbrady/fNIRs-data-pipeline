@@ -1,7 +1,7 @@
 
 # Import MNE-NIRS processing
 import mne
-from mne_nirs.channels import get_long_channels
+from mne_nirs.channels import get_long_channels, get_short_channels
 from mne_nirs.datasets import fnirs_motor_group
 from mne_nirs.signal_enhancement import enhance_negative_correlation
 
@@ -60,7 +60,6 @@ def aggregate_epochs(paths, trigger_id, variable_epoch_time, tmin, tmax):
         ls = f_path.split('/')
         res = list(filter(lambda a: 'sub' in a, ls))
         sub_id = int(res[0].split('-')[-1])
-        print("sub_id", sub_id)
         for epoch in epochs:
             for cidx, condition in enumerate(epoch.event_id):
                 all_epochs[condition].append(epoch[condition])
@@ -75,9 +74,6 @@ def aggregate_epochs(paths, trigger_id, variable_epoch_time, tmin, tmax):
                 }
 
                 all_data.append(epoch_data)
-    print("EVENTS")
-    print(event_dict)
-    print(events)
     # TODO: raw_haemo throws a weird error when you try to put it into the dataframe
     # dataframe would be better but
     # all_data_df = pd.DataFrame(all_data)
@@ -110,7 +106,7 @@ def individual_analysis(bids_path, trigger_id, variable_epoch_time, tmax, custom
     raw_intensity = get_long_channels(raw_intensity, min_dist=0.01)
 
     if trigger_id:
-        print(trigger_id)
+        
         # Rename the numeric triggers for ease of processing later
         raw_intensity.annotations.rename(trigger_id)
 
