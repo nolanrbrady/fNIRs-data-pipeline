@@ -33,8 +33,9 @@ import seaborn as sns
 def create_design_matrix(all_data, tmin=None, tmax=None):
     updated_data = []
     for data in all_data:
-        epoch, condition, raw_haemo, raw_intensity, f_path, ID = data.values()
+        epoch, condition, raw_haemo, raw_intensity, f_path, ID, aux_df = data.values()
         events, event_dict = events_from_annotations(raw_haemo, verbose=False)
+
         for event in events:
             # Dynamically establish the task length
             if tmin and tmax:
@@ -44,12 +45,13 @@ def create_design_matrix(all_data, tmin=None, tmax=None):
                 current_event_time = events[-1][0]
                 task_len = current_event_time - prev_event_time
 
+        #TODO: Make sure that max_dist is accurate
+        # NIRx says short channels are around 8mm
         # Find short channels if they are available
-        short_channels = get_short_channels(raw_haemo, max_dist=0.5)
+        short_channels = get_short_channels(raw_haemo, max_dist=8)
 
         #TODO: If it fails here I think it's because the trigger id's need to be renamed.
         design_matrix = make_first_level_design_matrix(raw_haemo, stim_dur=task_len)
-        data['design_matrix'] = design_matrix
 
         # Check for Short channels and if they're present include them into the design matrix
         if len(short_channels):
@@ -58,7 +60,16 @@ def create_design_matrix(all_data, tmin=None, tmax=None):
 
             design_matrix["ShortHbR"] = np.mean(short_channels.copy().pick(
                                                 picks="hbr").get_data(), axis=0)
+        nan_free = ~np.isnan(aux_df).any()
+        print("Nan_free? ", nan_free)
+        if np.isnan(aux_df.values).all() == True:
+            print(aux_df)
+            design_matrix = pd.concat([design_matrix, aux_df], axis=1)
+            
+        data['design_matrix'] = design_matrix
 
+        # fig, ax1 = plt.subplots(figsize=(10, 6), nrows=1, ncols=1)
+        # fig = plot_design_matrix(design_matrix, ax=ax1)
 
         updated_data.append(data)
     

@@ -4,6 +4,7 @@ import mne
 from mne_nirs.channels import get_long_channels, get_short_channels
 from mne_nirs.datasets import fnirs_motor_group
 from mne_nirs.signal_enhancement import enhance_negative_correlation
+from mne_nirs.io.snirf import read_snirf_aux_data
 
 # Import MNE processing
 from mne import Epochs, events_from_annotations, set_log_level
@@ -53,7 +54,7 @@ def aggregate_epochs(paths, trigger_id, variable_epoch_time, tmin, tmax):
 
     for f_path in paths:
 
-        epochs, raw_haemo, raw_intensity, path, events, event_dict = individual_analysis(
+        epochs, raw_haemo, raw_intensity, path, events, event_dict, aux_df = individual_analysis(
             f_path, trigger_id, variable_epoch_time, tmax)
 
         # Find subject ID from the f_path
@@ -70,7 +71,8 @@ def aggregate_epochs(paths, trigger_id, variable_epoch_time, tmin, tmax):
                     'raw_haemo': raw_haemo,
                     'raw_intensity': raw_intensity,
                     'f_path': path,
-                    'ID': sub_id
+                    'ID': sub_id,
+                    'aux_df': aux_df
                 }
 
                 all_data.append(epoch_data)
@@ -115,6 +117,10 @@ def individual_analysis(bids_path, trigger_id, variable_epoch_time, tmax, custom
     # Apply further data cleaning techniques and extract epochs
     raw_haemo = enhance_negative_correlation(raw_haemo)
 
+    # Get Accelerometer data
+    aux_df = read_snirf_aux_data(bids_path, raw_haemo)
+    
+
     if custom_triggers:
         # TODO: Need to add something here to be able to work in custom triggers
         print('We need to add code to handle custom triggers')
@@ -140,7 +146,7 @@ def individual_analysis(bids_path, trigger_id, variable_epoch_time, tmax, custom
         # of the data remains the same.
         epochs = [epochs]
 
-    return epochs, raw_haemo, raw_intensity, bids_path, events, event_dict
+    return epochs, raw_haemo, raw_intensity, bids_path, events, event_dict, aux_df
 
 
 def extract_all_amplitudes(all_epochs, tmin=False, tmax=False):
