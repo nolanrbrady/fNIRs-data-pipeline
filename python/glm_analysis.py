@@ -48,22 +48,23 @@ def create_design_matrix(all_data, tmin=None, tmax=None):
         #TODO: Make sure that max_dist is accurate
         # NIRx says short channels are around 8mm
         # Find short channels if they are available
-        short_channels = get_short_channels(raw_haemo, max_dist=8)
+        short_channels = get_short_channels(raw_haemo, max_dist=0.08)
+        # short_channels = []
+        print("SHORT CHANNELS")
+        print(short_channels.ch_names)
 
         #TODO: If it fails here I think it's because the trigger id's need to be renamed.
         design_matrix = make_first_level_design_matrix(raw_haemo, stim_dur=task_len)
 
         # Check for Short channels and if they're present include them into the design matrix
-        if len(short_channels):
+        if len(short_channels.ch_names):
             design_matrix["ShortHbO"] = np.mean(short_channels.copy().pick(
                                     picks="hbo").get_data(), axis=0)
 
             design_matrix["ShortHbR"] = np.mean(short_channels.copy().pick(
                                                 picks="hbr").get_data(), axis=0)
         nan_free = ~np.isnan(aux_df).any()
-        print("Nan_free? ", nan_free)
         if np.isnan(aux_df.values).all() == True:
-            print(aux_df)
             design_matrix = pd.concat([design_matrix, aux_df], axis=1)
             
         data['design_matrix'] = design_matrix
