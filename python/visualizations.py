@@ -60,7 +60,7 @@ def group_topological_visualisation(df_cha, columns_for_glm_contrast, raw_haemo,
                             ch_summary, groups=ch_summary["ID"]).fit(method='nm')
 
         ch_model_df = statsmodels_to_results(ch_model)
-        # print(ch_model_df)
+        
         ch_model_df['Coef.'] = ch_model_df['Coef.'] * 1e7 
 
         for condition_id, condition in enumerate(columns_for_glm_contrast):
@@ -151,7 +151,6 @@ def group_plot_visualisation(df_cha, columns_for_glm_contrast, raw_haemo):
     cha_model = smf.mixedlm("theta ~ -1 + Condition", grp_results, groups=grp_results["ID"]).fit(method='nm')
     
     df = statsmodels_to_results(cha_model)
-    print(df)
 
     sns.catplot(x="Condition", y="Coef.", hue="Significant", data=df, ci=None, palette="muted", height=4, s=10)
 
@@ -172,7 +171,6 @@ def plot_waveform_analysis(all_evokeds, variable_epoch_time):
 
         for (pick, color) in zip(['hbo', 'hbr'], ['r', 'b']):
             for idx, evoked in enumerate(all_evokeds):
-                print(all_evokeds[evoked])
                 plot_compare_evokeds({evoked: all_evokeds[evoked]}, combine='mean',
                                     picks=pick, axes=axes[idx], show=False,
                                     colors=[color], legend=False, ylim=lims, ci=0.95,

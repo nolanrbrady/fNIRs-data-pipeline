@@ -126,7 +126,7 @@ def individual_analysis(bids_path, trigger_id, variable_epoch_time, tmax, custom
         print('We need to add code to handle custom triggers')
     else:
         events, event_dict = events_from_annotations(raw_haemo, verbose=False)
-        print(events, event_dict)
+        # print(events, event_dict)
 
     # Logic splits here since there are fundamental differences in how we handle Epoch
     # generation in dynamic intervals instead of block intervals.
