@@ -1,9 +1,10 @@
 
 # Import MNE-NIRS processing
 import mne
-from mne_nirs.channels import get_long_channels
+from mne_nirs.channels import get_long_channels, get_short_channels
 from mne_nirs.datasets import fnirs_motor_group
 from mne_nirs.signal_enhancement import enhance_negative_correlation
+from mne_nirs.io.snirf import read_snirf_aux_data
 
 # Import MNE processing
 from mne import Epochs, events_from_annotations, set_log_level
@@ -53,14 +54,13 @@ def aggregate_epochs(paths, trigger_id, variable_epoch_time, tmin, tmax):
 
     for f_path in paths:
 
-        epochs, raw_haemo, raw_intensity, path, events, event_dict = individual_analysis(
+        epochs, raw_haemo, raw_intensity, path, events, event_dict, aux_df = individual_analysis(
             f_path, trigger_id, variable_epoch_time, tmax)
 
         # Find subject ID from the f_path
         ls = f_path.split('/')
         res = list(filter(lambda a: 'sub' in a, ls))
         sub_id = int(res[0].split('-')[-1])
-        print("sub_id", sub_id)
         for epoch in epochs:
             for cidx, condition in enumerate(epoch.event_id):
                 all_epochs[condition].append(epoch[condition])
@@ -71,13 +71,11 @@ def aggregate_epochs(paths, trigger_id, variable_epoch_time, tmin, tmax):
                     'raw_haemo': raw_haemo,
                     'raw_intensity': raw_intensity,
                     'f_path': path,
-                    'ID': sub_id
+                    'ID': sub_id,
+                    'aux_df': aux_df
                 }
 
                 all_data.append(epoch_data)
-    print("EVENTS")
-    print(event_dict)
-    print(events)
     # TODO: raw_haemo throws a weird error when you try to put it into the dataframe
     # dataframe would be better but
     # all_data_df = pd.DataFrame(all_data)
@@ -110,7 +108,7 @@ def individual_analysis(bids_path, trigger_id, variable_epoch_time, tmax, custom
     raw_intensity = get_long_channels(raw_intensity, min_dist=0.01)
 
     if trigger_id:
-        print(trigger_id)
+        
         # Rename the numeric triggers for ease of processing later
         raw_intensity.annotations.rename(trigger_id)
 
@@ -119,12 +117,16 @@ def individual_analysis(bids_path, trigger_id, variable_epoch_time, tmax, custom
     # Apply further data cleaning techniques and extract epochs
     raw_haemo = enhance_negative_correlation(raw_haemo)
 
+    # Get Accelerometer data
+    aux_df = read_snirf_aux_data(bids_path, raw_haemo)
+    
+
     if custom_triggers:
         # TODO: Need to add something here to be able to work in custom triggers
         print('We need to add code to handle custom triggers')
     else:
         events, event_dict = events_from_annotations(raw_haemo, verbose=False)
-        print(events, event_dict)
+        # print(events, event_dict)
 
     # Logic splits here since there are fundamental differences in how we handle Epoch
     # generation in dynamic intervals instead of block intervals.
@@ -144,7 +146,7 @@ def individual_analysis(bids_path, trigger_id, variable_epoch_time, tmax, custom
         # of the data remains the same.
         epochs = [epochs]
 
-    return epochs, raw_haemo, raw_intensity, bids_path, events, event_dict
+    return epochs, raw_haemo, raw_intensity, bids_path, events, event_dict, aux_df
 
 
 def extract_all_amplitudes(all_epochs, tmin=False, tmax=False):
