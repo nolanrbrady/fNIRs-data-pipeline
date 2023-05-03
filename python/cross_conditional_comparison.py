@@ -30,8 +30,6 @@ import seaborn as sns
 
 def two_sample_permutation_test(group_data, raw_haemo, columns_for_contrast, contrasts_dict):
     ch_names = raw_haemo.ch_names
-    column_1 = columns_for_contrast[0]
-    column_2 = columns_for_contrast[-1]
     df_con_1_2 = contrasts_dict['contrast_1']
     df_con_2_1 = contrasts_dict['contrast_2']
     contrasts = [df_con_1_2, df_con_2_1]
@@ -61,16 +59,12 @@ def two_sample_permutation_test(group_data, raw_haemo, columns_for_contrast, con
         plot_glm_group_topo(raw_haemo.copy().pick(picks="hbo"),
                             con_model_df, names=ch_names, colorbar=True, axes=axes)
 
-
-    # ------------------------------------
-    # Apply FDR Correction
-    # ------------------------------------
-    alpha = 0.05
-
-    for idx, constrast in enumerate(contrasts):
-        
-        mask = constrast['Significant'] == True
-        contrast_df = constrast[mask]
+        # ------------------------------------
+        # Apply FDR Correction
+        # ------------------------------------
+        alpha = 0.05
+        mask = contrast['Significant'] == True
+        contrast_df = contrast[mask]
         p_vals = contrast_df['p_value']
         reject_fdr, pval_fdr = fdr_correction(p_vals, alpha=alpha, method='indep')
         contrast_df['fdr_status'] = reject_fdr
@@ -80,8 +74,7 @@ def two_sample_permutation_test(group_data, raw_haemo, columns_for_contrast, con
 
         # NOTE: To see all significant channels across all participants simply use `.drop_duplicates()`
         contrast_df_fdr = contrast_df_fdr.drop_duplicates(subset=['ch_name'], keep='last')
-
-        # print(contrast_df_fdr)
+        
         contrast_df_fdr.to_csv(f'{analysis}_contrast_model_data.csv')
     
 
