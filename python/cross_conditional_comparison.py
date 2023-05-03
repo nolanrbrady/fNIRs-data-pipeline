@@ -26,6 +26,7 @@ import statsmodels.formula.api as smf
 # Import Plotting Library
 import matplotlib.pyplot as plt
 import matplotlib as mpl
+import matplotlib.colors as mcolors
 import seaborn as sns
 
 def two_sample_permutation_test(group_data, raw_haemo, columns_for_contrast, contrasts_dict):
@@ -36,6 +37,10 @@ def two_sample_permutation_test(group_data, raw_haemo, columns_for_contrast, con
     conditions = [[0,-1], [-1,0]]
     chromas = ['hbo', 'hbr']
     for chroma in chromas:
+        hbo_colors = ['#FFFFFF', '#FF0000']  # Red-to-blue gradient
+        hbr_colors = ['#FFFFFF', '#0000FF']  # Red-to-blue gradient
+        colors = hbo_colors if chroma == 'hbo' else hbr_colors
+        cmap = mcolors.LinearSegmentedColormap.from_list('my_cmap', colors, N=256)
         for idx, contrast in enumerate(contrasts):
             # Figure out what the comparison is and generate title
             condition_order = conditions[idx]
@@ -59,7 +64,7 @@ def two_sample_permutation_test(group_data, raw_haemo, columns_for_contrast, con
                                                     picks=chroma).ch_names)
 
             plot_glm_group_topo(raw_haemo.copy().pick(picks=chroma),
-                                con_model_df, names=ch_names, colorbar=True, axes=axes)
+                                con_model_df, cmap=cmap, names=ch_names, colorbar=True, axes=axes)
 
             # ------------------------------------
             # Apply FDR Correction
