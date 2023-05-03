@@ -28,20 +28,23 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 import seaborn as sns
 
-def two_sample_permutation_test(group_data, raw_haemo, columns_for_contrast):
-    ignored_vals = ['drift', 'Start', 'constant']
-    group = group_data['all_groups']
-    df_con = group['contrasts_df']
+def two_sample_permutation_test(group_data, raw_haemo, columns_for_contrast, contrasts_dict):
     ch_names = raw_haemo.ch_names
     column_1 = columns_for_contrast[0]
     column_2 = columns_for_contrast[-1]
-
+    df_con_1_2 = contrasts_dict['contrast_1']
+    df_con_2_1 = contrasts_dict['contrast_2']
+    contrasts = [df_con_1_2, df_con_2_1]
+    conditions = [column_1, column_2]
+    # ------------------------------------
+    # Contrast Condition 1 - Condition 2
+    # ------------------------------------
     fig, axes = plt.subplots(nrows=1, ncols=1, figsize=(6, 6))
-    con_summary = df_con.query("Chroma in ['hbo']")
+    con_1_2_summary = df_con_1_2.query("Chroma in ['hbo']")
 
     # Run group level model and convert to dataframe
     con_model = smf.mixedlm("effect ~ -1 + ch_name:Chroma",
-                            con_summary, groups=con_summary["ID"]).fit(method='nm')
+                            con_1_2_summary, groups=con_1_2_summary["ID"]).fit(method='nm')
     
     analysis = f'{column_1}-{column_2}'
     # NOTE: This is based off of the code in the `create_glm_df()` function
@@ -56,21 +59,50 @@ def two_sample_permutation_test(group_data, raw_haemo, columns_for_contrast):
     plot_glm_group_topo(raw_haemo.copy().pick(picks="hbo"),
                         con_model_df, names=ch_names, colorbar=True, axes=axes)
     
-    # Implement FDR Correction
+    # ------------------------------------
+    # Contrast Condition 2 - Condition 1
+    # ------------------------------------
+    fig, axes = plt.subplots(nrows=1, ncols=1, figsize=(6, 6))
+    con_2_1_summary = df_con_2_1.query("Chroma in ['hbo']")
+
+    # Run group level model and convert to dataframe
+    con_model = smf.mixedlm("effect ~ -1 + ch_name:Chroma",
+                            con_2_1_summary, groups=con_2_1_summary["ID"]).fit(method='nm')
+    
+    analysis = f'{column_2}-{column_1}'
+    # NOTE: This is based off of the code in the `create_glm_df()` function
+    contrast_title = f'{analysis} Conditional Difference'
+    fig.suptitle(contrast_title)
+
+
+    con_model_df = statsmodels_to_results(con_model,
+                                        order=raw_haemo.copy().pick(
+                                            picks="hbo").ch_names)
+
+    plot_glm_group_topo(raw_haemo.copy().pick(picks="hbo"),
+                        con_model_df, names=ch_names, colorbar=True, axes=axes)
+
+
+    # ------------------------------------
+    # Apply FDR Correction
+    # ------------------------------------
     alpha = 0.05
-    mask = df_con['Significant'] == True
-    contrast_df = df_con[mask]
-    p_vals = contrast_df['p_value']
-    reject_fdr, pval_fdr = fdr_correction(p_vals, alpha=alpha, method='indep')
-    contrast_df['fdr_status'] = reject_fdr
 
-    # Find all the channels that survive FDR
-    contrast_df_fdr = contrast_df.loc[(contrast_df['fdr_status'] == True)]
+    for idx, constrast in enumerate(contrasts):
+        
+        mask = constrast['Significant'] == True
+        contrast_df = constrast[mask]
+        p_vals = contrast_df['p_value']
+        reject_fdr, pval_fdr = fdr_correction(p_vals, alpha=alpha, method='indep')
+        contrast_df['fdr_status'] = reject_fdr
 
-    # NOTE: To see all significant channels across all participants simply use `.drop_duplicates()`
-    contrast_df_fdr = contrast_df_fdr.drop_duplicates(subset=['ch_name'], keep='last')
+        # Find all the channels that survive FDR
+        contrast_df_fdr = contrast_df.loc[(contrast_df['fdr_status'] == True)]
 
-    # print(contrast_df_fdr)
-    contrast_df_fdr.to_csv(f'{analysis}_contrast_model_data.csv')
+        # NOTE: To see all significant channels across all participants simply use `.drop_duplicates()`
+        contrast_df_fdr = contrast_df_fdr.drop_duplicates(subset=['ch_name'], keep='last')
+
+        # print(contrast_df_fdr)
+        contrast_df_fdr.to_csv(f'{analysis}_contrast_model_data.csv')
     
 
