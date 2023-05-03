@@ -36,12 +36,9 @@ def two_sample_permutation_test(group_data, raw_haemo, columns_for_contrast, con
     contrasts = [df_con_1_2, df_con_2_1]
     conditions = [[0,-1], [-1,0]]
     chromas = ['hbo', 'hbr']
-    for chroma in chromas:
-        hbo_colors = ['#FFFFFF', '#FF0000']  # Red-to-blue gradient
-        hbr_colors = ['#FFFFFF', '#0000FF']  # Red-to-blue gradient
-        colors = hbo_colors if chroma == 'hbo' else hbr_colors
-        cmap = mcolors.LinearSegmentedColormap.from_list('my_cmap', colors, N=256)
-        for idx, contrast in enumerate(contrasts):
+    for idx, contrast in enumerate(contrasts):
+        for chroma in chromas:
+            cmap = mpl.cm.Oranges if chroma == 'hbo' else mpl.cm.Blues
             # Figure out what the comparison is and generate title
             condition_order = conditions[idx]
             analysis = f'{columns_for_contrast[condition_order[0]]}-{columns_for_contrast[condition_order[-1]]}'
