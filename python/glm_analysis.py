@@ -93,10 +93,11 @@ def create_glm_df(glm_data, columns_for_contrast=None):
         if columns_for_contrast:
             # Define the GLM contrast that is to be evaluated
             contrast_matrix = np.eye(design_matrix.shape[1])
-            # print("Columns in Design matrix", design_matrix.columns)
             basic_conts = dict([(column, contrast_matrix[i])for i, column in enumerate(design_matrix.columns)])
             column_1 = columns_for_contrast[0]
             column_2 = columns_for_contrast[-1]
+
+            # NOTE: The order of column_1 and column_2 can be changed here in order to change the analysis
             contrast_LvR = basic_conts[column_1] - basic_conts[column_2]
 
             # Compute defined contrast
