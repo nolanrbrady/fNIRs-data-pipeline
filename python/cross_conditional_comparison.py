@@ -35,52 +35,31 @@ def two_sample_permutation_test(group_data, raw_haemo, columns_for_contrast, con
     df_con_1_2 = contrasts_dict['contrast_1']
     df_con_2_1 = contrasts_dict['contrast_2']
     contrasts = [df_con_1_2, df_con_2_1]
-    conditions = [column_1, column_2]
-    # ------------------------------------
-    # Contrast Condition 1 - Condition 2
-    # ------------------------------------
-    fig, axes = plt.subplots(nrows=1, ncols=1, figsize=(6, 6))
-    con_1_2_summary = df_con_1_2.query("Chroma in ['hbo']")
+    conditions = [[0,-1], [-1,0]]
+    for idx, contrast in enumerate(contrasts):
+        # Figure out what the comparison is and generate title
+        condition_order = conditions[idx]
+        analysis = f'{columns_for_contrast[condition_order[0]]}-{columns_for_contrast[condition_order[-1]]}'
+        
+        fig, axes = plt.subplots(nrows=1, ncols=1, figsize=(6, 6))
+        con_summary = contrast.query("Chroma in ['hbo']")
 
-    # Run group level model and convert to dataframe
-    con_model = smf.mixedlm("effect ~ -1 + ch_name:Chroma",
-                            con_1_2_summary, groups=con_1_2_summary["ID"]).fit(method='nm')
-    
-    analysis = f'{column_1}-{column_2}'
-    # NOTE: This is based off of the code in the `create_glm_df()` function
-    contrast_title = f'{analysis} Conditional Difference'
-    fig.suptitle(contrast_title)
-
-
-    con_model_df = statsmodels_to_results(con_model,
-                                        order=raw_haemo.copy().pick(
-                                            picks="hbo").ch_names)
-
-    plot_glm_group_topo(raw_haemo.copy().pick(picks="hbo"),
-                        con_model_df, names=ch_names, colorbar=True, axes=axes)
-    
-    # ------------------------------------
-    # Contrast Condition 2 - Condition 1
-    # ------------------------------------
-    fig, axes = plt.subplots(nrows=1, ncols=1, figsize=(6, 6))
-    con_2_1_summary = df_con_2_1.query("Chroma in ['hbo']")
-
-    # Run group level model and convert to dataframe
-    con_model = smf.mixedlm("effect ~ -1 + ch_name:Chroma",
-                            con_2_1_summary, groups=con_2_1_summary["ID"]).fit(method='nm')
-    
-    analysis = f'{column_2}-{column_1}'
-    # NOTE: This is based off of the code in the `create_glm_df()` function
-    contrast_title = f'{analysis} Conditional Difference'
-    fig.suptitle(contrast_title)
+        # Run group level model and convert to dataframe
+        con_model = smf.mixedlm("effect ~ -1 + ch_name:Chroma",
+                                con_summary, groups=con_summary["ID"]).fit(method='nm')
+        
+        
+        # NOTE: This is based off of the code in the `create_glm_df()` function
+        contrast_title = f'{analysis} Conditional Difference'
+        fig.suptitle(contrast_title)
 
 
-    con_model_df = statsmodels_to_results(con_model,
-                                        order=raw_haemo.copy().pick(
-                                            picks="hbo").ch_names)
+        con_model_df = statsmodels_to_results(con_model,
+                                            order=raw_haemo.copy().pick(
+                                                picks="hbo").ch_names)
 
-    plot_glm_group_topo(raw_haemo.copy().pick(picks="hbo"),
-                        con_model_df, names=ch_names, colorbar=True, axes=axes)
+        plot_glm_group_topo(raw_haemo.copy().pick(picks="hbo"),
+                            con_model_df, names=ch_names, colorbar=True, axes=axes)
 
 
     # ------------------------------------
