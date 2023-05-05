@@ -1,0 +1,2 @@
+,Coef.,Std.Err.,z,P>|z|,[0.025,0.975],Chroma,Significant,ch_name,fdr_status
+ch_name[S5_D6 hbo]:Chroma[hbo],1.2667204120103529e-06,3.644064662969846e-07,3.4761194686869223,0.0005087256098359934,5.524968623347539e-07,1.980943961685952e-06,hbo,True,S5_D6 hbo,True

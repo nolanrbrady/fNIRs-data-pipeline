@@ -22,6 +22,7 @@ import importlib
 import statsmodels.formula.api as smf
 import statsmodels as sm
 from scipy import stats
+from statsmodels.stats.weightstats import ztest as ztest
 
 
 # Local functions
@@ -331,11 +332,11 @@ def create_results_dataframe(df_cha, columns_for_glm_contrast, raw_haemo):
     return results
 
 
-def false_discovery_rate_correction(df, ignore, columns_for_fdr):
+def cross_condition_comparison(df, ignore, columns_for_fdr):
     channels = pd.Series(df['ch_name'].unique())
     conditions = pd.Series(df['Condition'].unique())
 
-    fdr_valid_channels = pd.DataFrame()
+    compared_channels = pd.DataFrame()
 
     for channel in channels:
         ch_df = df.loc[df['ch_name'] == channel]
@@ -358,7 +359,7 @@ def false_discovery_rate_correction(df, ignore, columns_for_fdr):
 
                 # Calculate the mean of each numeric column
                 column_means = numeric_columns.mean()
-
+                
                 # Create a new DataFrame to store the column means in one row
                 df_means = pd.DataFrame(column_means).T
                 df_numeric = non_numeric_columns.head(1)
@@ -374,6 +375,7 @@ def false_discovery_rate_correction(df, ignore, columns_for_fdr):
                 df_means['Condition'] = condition
 
                 condition_channels = pd.concat([df_means, condition_channels], ignore_index=True)
+
             # Perform two-sample t-test on the conditions to see if they're different
             if len(condition_channels) > 1:
                 cond1 = condition_channels['p_value'][0]
@@ -381,13 +383,16 @@ def false_discovery_rate_correction(df, ignore, columns_for_fdr):
                 p_vals = [cond1, cond2]
 
                 # Run the T-test to compare the conditions
+                print(p_vals)
                 result = stats.combine_pvalues(p_vals, method='fisher')
-
+                print(result)
                 result_pval = result[1]
-                
-                if result_pval <= 0.3:
+                # print("P-val:", result_pval, "Channel:", condition_channels)
+                if result_pval <= 1.05:
                     # print("VALID", condition_channels)
                     # fdr_valid_channels = fdr_valid_channels.append(condition_channels)
-                    fdr_valid_channels = pd.concat([fdr_valid_channels, condition_channels], ignore_index=True)
+                    compared_channels = pd.concat([compared_channels, condition_channels], ignore_index=True)
+
+            compared_channels = compared_channels.drop_duplicates()
                     
-    return fdr_valid_channels
+    return compared_channels

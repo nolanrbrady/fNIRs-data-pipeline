@@ -76,9 +76,11 @@ def create_design_matrix(all_data, sc_present, tmin=None, tmax=None):
 
 def create_glm_df(glm_data, columns_for_contrast=None):
     df_cha = pd.DataFrame() # Stores channel level results
-    df_con = pd.DataFrame() # Stores channel level contrast results
+    df_con_1_2 = pd.DataFrame() # Stores condition 1 - condition 2 comparison results
+    df_con_2_1 = pd.DataFrame() # Stores condition 2 - condition 1 comparison results
 
     for data in glm_data:
+        print(data)
         raw_haemo = data['raw_haemo']
         design_matrix = data['design_matrix']
         sub_id = data['ID']
@@ -93,24 +95,35 @@ def create_glm_df(glm_data, columns_for_contrast=None):
         if columns_for_contrast:
             # Define the GLM contrast that is to be evaluated
             contrast_matrix = np.eye(design_matrix.shape[1])
-            # print("Columns in Design matrix", design_matrix.columns)
             basic_conts = dict([(column, contrast_matrix[i])for i, column in enumerate(design_matrix.columns)])
             column_1 = columns_for_contrast[0]
             column_2 = columns_for_contrast[-1]
-            contrast_LvR = basic_conts[column_1] - basic_conts[column_2]
 
-            # Compute defined contrast
-            contrast = glm_est.compute_contrast(contrast_LvR)
-            con = contrast.to_dataframe()
-            con['ID'] = sub_id
+            # Create two sides comparison of conditions
+            contrast_LvR_1_2 = basic_conts[column_1] - basic_conts[column_2]
+            contrast_LvR_2_1 = basic_conts[column_2] - basic_conts[column_1]
 
-            df_con = pd.concat([df_con, con], ignore_index=True)
+            # Compute defined contrast between condition 1 and condition 2
+            contrast_1_2 = glm_est.compute_contrast(contrast_LvR_1_2)
+            con_1_2 = contrast_1_2.to_dataframe()
+            con_1_2['ID'] = sub_id
+
+            df_con_1_2 = pd.concat([df_con_1_2, con_1_2], ignore_index=True)
+
+            # Compute defined contrast between condition 2 and condition 1
+            contrast_2_1 = glm_est.compute_contrast(contrast_LvR_2_1)
+            con_2_1 = contrast_2_1.to_dataframe()
+            con_2_1['ID'] = sub_id
+
+            df_con_2_1 = pd.concat([df_con_2_1, con_2_1], ignore_index=True)
 
         
 
         df_cha = pd.concat([df_cha, cha], ignore_index=True)
+
+        contrasts = {'contrast_1': df_con_1_2, 'contrast_2': df_con_2_1}
         
-    return df_cha, df_con, glm_est
+    return df_cha, glm_est, contrasts
 
 
 def group_level_glm_analysis(df_cha, columns_for_group_analysis):
