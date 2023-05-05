@@ -49,9 +49,7 @@ def two_sample_permutation_test(group_data, raw_haemo, columns_for_contrast, con
             # Run group level model and convert to dataframe
             con_model = smf.mixedlm("effect ~ -1 + ch_name:Chroma",
                                     con_summary, groups=con_summary["ID"]).fit(method='nm')
-            
-            
-            # NOTE: This is based off of the code in the `create_glm_df()` function
+        
             contrast_title = f'{analysis} Conditional Difference ({chroma})'
             fig.suptitle(contrast_title)
 
@@ -67,9 +65,10 @@ def two_sample_permutation_test(group_data, raw_haemo, columns_for_contrast, con
             # Apply FDR Correction
             # ------------------------------------
             alpha = 0.05
-            mask = contrast['Significant'] == True
-            contrast_df = contrast[mask]
-            p_vals = contrast_df['p_value']
+            mask = con_model_df['Significant'] == True
+            contrast_df = con_model_df[mask]
+            # p_vals = contrast_df['p_value']
+            p_vals = contrast_df['P>|z|']
             reject_fdr, pval_fdr = fdr_correction(p_vals, alpha=alpha, method='indep')
             contrast_df['fdr_status'] = reject_fdr
 

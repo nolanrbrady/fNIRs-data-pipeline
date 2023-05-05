@@ -80,6 +80,7 @@ def create_glm_df(glm_data, columns_for_contrast=None):
     df_con_2_1 = pd.DataFrame() # Stores condition 2 - condition 1 comparison results
 
     for data in glm_data:
+        print(data)
         raw_haemo = data['raw_haemo']
         design_matrix = data['design_matrix']
         sub_id = data['ID']
