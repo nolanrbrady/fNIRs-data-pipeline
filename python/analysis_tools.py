@@ -28,12 +28,14 @@ from statsmodels.stats.weightstats import ztest as ztest
 # Local functions
 import quality_eval
 import dynamic_interval_tools
+import custom_timestamp
 
 importlib.reload(quality_eval)
 importlib.reload(dynamic_interval_tools)
+importlib.reload(custom_timestamp)
 
 
-def aggregate_epochs(paths, trigger_id, variable_epoch_time, tmin, tmax):
+def aggregate_epochs(custom_trigger_df, paths, trigger_id, variable_epoch_time, tmin, tmax):
     """
     TLDR:
         Cycles through the participants in bids folders and returns epochs based on the trigger associated with it
@@ -52,16 +54,17 @@ def aggregate_epochs(paths, trigger_id, variable_epoch_time, tmin, tmax):
     all_evokeds = defaultdict(list)
     # Temporary storage for the items we're using in all_data_df
     all_data = []
-
     for f_path in paths:
-
-        epochs, raw_haemo, raw_intensity, path, events, event_dict, aux_df = individual_analysis(
-            f_path, trigger_id, variable_epoch_time, tmax)
 
         # Find subject ID from the f_path
         ls = f_path.split('/')
         res = list(filter(lambda a: 'sub' in a, ls))
         sub_id = int(res[0].split('-')[-1])
+
+        epochs, raw_haemo, raw_intensity, path, events, event_dict, aux_df = individual_analysis(
+            custom_trigger_df, f_path, trigger_id, variable_epoch_time, tmax, sub_id)
+
+        
         for epoch in epochs:
             for cidx, condition in enumerate(epoch.event_id):
                 all_epochs[condition].append(epoch[condition])
@@ -86,7 +89,7 @@ def aggregate_epochs(paths, trigger_id, variable_epoch_time, tmin, tmax):
 
 
 
-def individual_analysis(bids_path, trigger_id, variable_epoch_time, tmax, custom_triggers=False):
+def individual_analysis(custom_trigger_df, bids_path, trigger_id, variable_epoch_time, tmax, sub_id, custom_trigger=False):
     """
     TLDR:
         This function takes in the file path to the BIDS directory and the dictionary that renames numeric triggers.
@@ -103,6 +106,14 @@ def individual_analysis(bids_path, trigger_id, variable_epoch_time, tmax, custom
     """
     # Read data with annotations in BIDS format
     # raw_intensity = read_raw_bids(bids_path=bids_path, verbose=False)
+
+    adjusted_path = '/'.join(bids_path.split('/')[:-1])
+    content = os.listdir(adjusted_path)
+
+    if len(content) == 2:
+       #TODO: concatinate the scans, normalize them and save a consolidated snirf file. 
+       print("test", bids_path)
+
     raw_intensity = mne.io.read_raw_snirf(
         bids_path, verbose=True, preload=False)
 
@@ -122,9 +133,10 @@ def individual_analysis(bids_path, trigger_id, variable_epoch_time, tmax, custom
     aux_df = read_snirf_aux_data(bids_path, raw_haemo)
     
 
-    if custom_triggers:
+    if custom_trigger_df:
         # TODO: Need to add something here to be able to work in custom triggers
         print('We need to add code to handle custom triggers')
+        custom_timestamp.create_custom_events(custom_trigger_df, sub_id)
     else:
         events, event_dict = events_from_annotations(raw_haemo, verbose=False)
         # print(events, event_dict)
