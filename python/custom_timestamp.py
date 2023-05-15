@@ -32,10 +32,16 @@ def create_custom_events(csv, sub_id, raw_haemo):
     # print(subject_timestamps)
 
     # Adjust the timestamps to be number of scenes from start instead of timestamps
-    def convert_timestamp_to_delta(entry):
+    def convert_timestamp_to_sample(entry):
         trigger_timestamp = datetime.strptime(entry, "%H:%M:%S")
         delta = trigger_timestamp - scan_start_timestamp
-        
-        return delta
+
+        # convert timestamps to seconds then to samples
+        hours, minutes, seconds = str(delta).split(':')
+        sample = round(((int(hours) * 60 * 60) + (int(minutes) * 60) + int(seconds)) / sfreq)
+        return sample
     
-    subject_timestamps = subject_timestamps['start'].apply(convert_timestamp_to_delta)
+    subject_timestamps['start'] = subject_timestamps['start'].apply(convert_timestamp_to_sample)
+    subject_timestamps['end'] = subject_timestamps['end'].apply(convert_timestamp_to_sample)
+
+    print(subject_timestamps)
