@@ -136,7 +136,7 @@ def individual_analysis(custom_trigger_df, bids_path, trigger_id, variable_epoch
     if custom_trigger_df:
         # TODO: Need to add something here to be able to work in custom triggers
         print('We need to add code to handle custom triggers')
-        custom_timestamp.create_custom_events(custom_trigger_df, sub_id)
+        custom_timestamp.create_custom_events(custom_trigger_df, sub_id, raw_haemo)
     else:
         events, event_dict = events_from_annotations(raw_haemo, verbose=False)
         # print(events, event_dict)

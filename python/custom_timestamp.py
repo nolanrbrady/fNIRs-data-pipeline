@@ -18,11 +18,24 @@ import time
 import pandas as pd
 import numpy as np
 
-def create_custom_events(csv, sub_id):
+def create_custom_events(csv, sub_id, raw_haemo):
     df = pd.read_csv(csv)
-    print("Subject ID: ", sub_id)
+    start_time = str(raw_haemo.info['meas_date']).split(' ')[-1]
+    start_time = start_time.split('+')[0]
+    scan_start_timestamp = datetime.strptime(start_time, "%H:%M:%S")
+    sfreq = raw_haemo.info['sfreq']
+    # print("Subject ID: ", sub_id, scan_start_timestamp, sfreq)
     # Clean the empty columns
     df = df.filter(regex='^(?!Unnamed).*$', axis=1)
     # Keep only the timestamps from the subject getting processed
     subject_timestamps = df.loc[df['subject_id'] == sub_id]
-    print(subject_timestamps)
+    # print(subject_timestamps)
+
+    # Adjust the timestamps to be number of scenes from start instead of timestamps
+    def convert_timestamp_to_delta(entry):
+        trigger_timestamp = datetime.strptime(entry, "%H:%M:%S")
+        delta = trigger_timestamp - scan_start_timestamp
+        
+        return delta
+    
+    subject_timestamps = subject_timestamps['start'].apply(convert_timestamp_to_delta)
