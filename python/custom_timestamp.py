@@ -24,12 +24,10 @@ def create_custom_events(csv, sub_id, raw_haemo):
     start_time = start_time.split('+')[0]
     scan_start_timestamp = datetime.strptime(start_time, "%H:%M:%S")
     sfreq = raw_haemo.info['sfreq']
-    # print("Subject ID: ", sub_id, scan_start_timestamp, sfreq)
     # Clean the empty columns
     df = df.filter(regex='^(?!Unnamed).*$', axis=1)
     # Keep only the timestamps from the subject getting processed
     subject_timestamps = df.loc[df['subject_id'] == sub_id]
-    # print(subject_timestamps)
 
     # Adjust the timestamps to be number of scenes from start instead of timestamps
     def convert_timestamp_to_sample(entry):
@@ -44,4 +42,14 @@ def create_custom_events(csv, sub_id, raw_haemo):
     subject_timestamps['start'] = subject_timestamps['start'].apply(convert_timestamp_to_sample)
     subject_timestamps['end'] = subject_timestamps['end'].apply(convert_timestamp_to_sample)
 
-    print(subject_timestamps)
+    events = []
+    # Create the events array
+    for index, row in subject_timestamps.iterrows():
+        start_sample = row['start']
+        end_sample = row['end']
+        trigger_id = row['trigger_id']
+
+        events.append([start_sample, 0, trigger_id])
+        events.append([end_sample, 0, trigger_id])
+    
+    return events
