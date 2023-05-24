@@ -57,8 +57,8 @@ def two_sample_permutation_test(group_data, raw_haemo, columns_for_contrast, con
             con_model_df = statsmodels_to_results(con_model,
                                                 order=raw_haemo.copy().pick(
                                                     picks=chroma).ch_names)
-
-            plot_glm_group_topo(raw_haemo.copy().pick(picks=chroma),
+            raw = raw_haemo.copy().pick_types(fnirs=True, exclude='bads')
+            plot_glm_group_topo(raw.copy().pick(picks=chroma),
                                 con_model_df, cmap=cmap, names=ch_names, colorbar=True, axes=axes)
 
             # ------------------------------------
