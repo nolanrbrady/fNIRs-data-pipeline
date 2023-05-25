@@ -115,6 +115,8 @@ def individual_analysis(custom_trigger_df, bids_path, trigger_id, variable_epoch
     raw_haemo, raw_intensity = generate_raw_haemo(bids_path, trigger_id)
     print("Past raw generation")
 
+    # Eliminate bad channels
+    raw_haemo = raw_haemo.copy().pick_types(fnirs=True, exclude='bads')
     # Get Accelerometer data
     aux_df = read_snirf_aux_data(bids_path, raw_haemo)
 
@@ -125,10 +127,7 @@ def individual_analysis(custom_trigger_df, bids_path, trigger_id, variable_epoch
 
         annotations = mne.annotations_from_events(events, sfreq)
         print("Annotations from events fired")
-
-        raw = raw_haemo.copy().pick_types(fnirs=True, exclude='bads')
-        print(raw)
-        epochs = mne.EpochsArray(data=raw, info=raw.info, events=annotations, event_id=None, reject=dict(hbo=200e-6))
+        epochs = mne.EpochsArray(data=raw_haemo, info=raw_haemo.info, events=annotations, event_id=None, reject=dict(hbo=200e-6))
         print('Epochs from the annotations')
         print(epochs)
     else:
@@ -148,9 +147,7 @@ def individual_analysis(custom_trigger_df, bids_path, trigger_id, variable_epoch
         # Remove all STOP triggers to hardcode duration to 30 secs per MNE specs
         # TODO: Need a prompt for end triggers present. If NOT present skip this part.
         # events = events[::2]
-
-        raw_haemo = raw_haemo.copy().pick_types(fnirs=True, exclude='bads')
-
+        
         epochs = Epochs(raw_haemo, events, event_id=event_dict, tmin=-1, tmax=tmax,
                         reject=dict(hbo=200e-6), reject_by_annotation=True,
                         proj=True, baseline=(None, 0), detrend=0,
