@@ -16,13 +16,9 @@ import numpy as np
 import os
 from collections import defaultdict
 from copy import deepcopy
-from itertools import compress
-import matplotlib.pyplot as plt
 import importlib
 import statsmodels.formula.api as smf
-import statsmodels as sm
 from scipy import stats
-from statsmodels.stats.weightstats import ztest as ztest
 
 
 # Local functions
@@ -34,8 +30,8 @@ importlib.reload(quality_eval)
 importlib.reload(dynamic_interval_tools)
 importlib.reload(custom_timestamp)
 
-
 def aggregate_epochs(custom_trigger_df, paths, trigger_id, variable_epoch_time, tmin, tmax):
+    print(custom_trigger_df, paths, trigger_id, variable_epoch_time, tmin, tmax)
     """
     TLDR:
         Cycles through the participants in bids folders and returns epochs based on the trigger associated with it
@@ -54,17 +50,19 @@ def aggregate_epochs(custom_trigger_df, paths, trigger_id, variable_epoch_time, 
     all_evokeds = defaultdict(list)
     # Temporary storage for the items we're using in all_data_df
     all_data = []
-    for f_path in paths:
-
+    filtered_paths = list(filter(lambda x: x is not None, paths))
+    print(filtered_paths)
+    for f_path in filtered_paths:
         # Find subject ID from the f_path
         ls = f_path.split('/')
         res = list(filter(lambda a: 'sub' in a, ls))
         sub_id = int(res[0].split('-')[-1])
 
+
         epochs, raw_haemo, raw_intensity, path, events, event_dict, aux_df = individual_analysis(
             custom_trigger_df, f_path, trigger_id, variable_epoch_time, tmax, sub_id)
 
-        
+        print("Epochs", epochs)
         for epoch in epochs:
             for cidx, condition in enumerate(epoch.event_id):
                 all_epochs[condition].append(epoch[condition])
@@ -80,6 +78,7 @@ def aggregate_epochs(custom_trigger_df, paths, trigger_id, variable_epoch_time, 
                 }
 
                 all_data.append(epoch_data)
+                print("Epochs", epoch_data)
     # TODO: raw_haemo throws a weird error when you try to put it into the dataframe
     # dataframe would be better but
     # all_data_df = pd.DataFrame(all_data)
@@ -106,42 +105,39 @@ def individual_analysis(custom_trigger_df, bids_path, trigger_id, variable_epoch
     """
     # Read data with annotations in BIDS format
     # raw_intensity = read_raw_bids(bids_path=bids_path, verbose=False)
-
+    print("bids_path", bids_path)
     adjusted_path = '/'.join(bids_path.split('/')[:-1])
     content = os.listdir(adjusted_path)
-
-    if len(content) == 2:
+    if len(content) < 3:
        #TODO: concatinate the scans, normalize them and save a consolidated snirf file. 
        print("test", bids_path)
 
-    raw_intensity = mne.io.read_raw_snirf(
-        bids_path, verbose=True, preload=False)
-
-    raw_intensity = get_long_channels(raw_intensity, min_dist=0.01)
-
-    if trigger_id:
-        
-        # Rename the numeric triggers for ease of processing later
-        raw_intensity.annotations.rename(trigger_id)
-
-    raw_haemo = quality_eval.signal_preprocessing(raw_intensity)
-
-    # Apply further data cleaning techniques and extract epochs
-    raw_haemo = enhance_negative_correlation(raw_haemo)
+    raw_haemo, raw_intensity = generate_raw_haemo(bids_path, trigger_id)
+    print("Past raw generation")
 
     # Get Accelerometer data
     aux_df = read_snirf_aux_data(bids_path, raw_haemo)
-    
 
     if custom_trigger_df:
-        # TODO: Need to add something here to be able to work in custom triggers
-        print('We need to add code to handle custom triggers')
+        sfreq = raw_haemo.info['sfreq']
         events = custom_timestamp.create_custom_events(custom_trigger_df, sub_id, raw_haemo)
-        print(events)
-        print(bids_path)
+        events = np.array(events)
+
+        annotations = mne.annotations_from_events(events, sfreq)
+        print("Annotations from events fired")
+
+        raw = raw_haemo.copy().pick_types(fnirs=True, exclude='bads')
+        print(raw)
+        epochs = mne.EpochsArray(data=raw, info=raw.info, events=annotations, event_id=None, reject=dict(hbo=200e-6))
+        print('Epochs from the annotations')
+        print(epochs)
     else:
         events, event_dict = events_from_annotations(raw_haemo, verbose=False)
-        # print(events, event_dict)
+        print("No custom triggers path firing")
+
+        #TODO: Remove after F.A.S.T study
+        events = events[1:]
+        print(events)
 
     # Logic splits here since there are fundamental differences in how we handle Epoch
     # generation in dynamic intervals instead of block intervals.
@@ -152,6 +148,8 @@ def individual_analysis(custom_trigger_df, bids_path, trigger_id, variable_epoch
         # Remove all STOP triggers to hardcode duration to 30 secs per MNE specs
         # TODO: Need a prompt for end triggers present. If NOT present skip this part.
         # events = events[::2]
+
+        raw_haemo = raw_haemo.copy().pick_types(fnirs=True, exclude='bads')
 
         epochs = Epochs(raw_haemo, events, event_id=event_dict, tmin=-1, tmax=tmax,
                         reject=dict(hbo=200e-6), reject_by_annotation=True,
@@ -410,3 +408,21 @@ def cross_condition_comparison(df, ignore, columns_for_fdr):
             compared_channels = compared_channels.drop_duplicates()
                     
     return compared_channels
+
+
+def generate_raw_haemo(bids_path, trigger_id=None):
+    print("bids_path in generate raw function", bids_path)
+    raw_intensity = mne.io.read_raw_snirf(bids_path, verbose=True, preload=False)
+    print("Does this fire?", raw_intensity)
+    raw_intensity = get_long_channels(raw_intensity, min_dist=0.01)
+
+    if trigger_id:
+        # Rename the numeric triggers for ease of processing later
+        raw_intensity.annotations.rename(trigger_id)
+
+    raw_haemo = quality_eval.signal_preprocessing(raw_intensity)
+
+    # Apply further data cleaning techniques and extract epochs
+    raw_haemo = enhance_negative_correlation(raw_haemo)
+
+    return raw_haemo, raw_intensity
