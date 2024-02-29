@@ -300,7 +300,7 @@ def find_significant_channels(ch_model_df, adjust_coef=False):
         sig_df = data[mask]
         if adjust_coef:
             sig_df['Coef.'] = sig_df['Coef.']*1e7
-        all_sig_channels = all_sig_channels.append(sig_df)
+        all_sig_channels = pd.concat([all_sig_channels, sig_df], ignore_index=True)
 
     return all_sig_channels
 
